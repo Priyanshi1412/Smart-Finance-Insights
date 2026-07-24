@@ -1,87 +1,77 @@
 <div align="center">
 
-# 💰 Smart Finance Insights
+# Smart Finance Insights
 
 ### Your Personal Finance Command Center
 
-A full-stack MERN application with AI-powered financial recommendations, investment tracking, and beautiful glassmorphism UI — built to help you take control of your money.
+A full-stack MERN application with AI-powered financial recommendations, investment tracking, portfolio analytics, and beautiful glassmorphism UI — built to help you take control of your money.
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Node.js](https://img.shields.io/badge/Node.js-18-339933?style=flat-square&logo=node.js&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Version](https://img.shields.io/badge/Version-2.0.0-3B82F6?style=flat-square)
 ![License](https://img.shields.io/badge/License-Private-FF6B6B?style=flat-square)
 
 </div>
 
 ---
 
-## ✨ What Makes It Special
+## What Makes It Special
 
-<table>
-<tr>
-<td width="50%">
-
-### 🎯 Core Features
-- **Dashboard** — Real-time financial overview with summary cards
+### Core Features
+- **Dashboard** — Real-time financial overview with summary cards, investment summary, portfolio growth, asset allocation, top/worst performers, goals progress, and risk analysis
 - **Income Tracking** — Add, edit, delete with source categorization
 - **Expense Management** — Category-wise tracking with monthly filters
 - **Budget Planning** — Set limits per category, visual progress bars
-- **Savings Goals** — Create goals, track progress, AI recommendations
-- **Investment Portfolio** — Full CRUD, doughnut charts, type breakdown
+- **Financial Goal Planning** — Create goals with priority/status, track contributions, analytics, achievements, and AI recommendations
+- **Investment Portfolio** — Full CRUD, profit/loss tracking, type/category breakdown, diversification score
+- **Asset Allocation** — Interactive doughnut charts by type and category, allocation percentages, diversification analysis, filters
+- **Portfolio Analytics** — Comprehensive analytics combining investments and goals, risk scoring, performance tables
 - **AI Insights** — Rule-based recommendations from your spending data
 - **Reports** — Financial metrics and savings rate analysis
 
-</td>
-<td width="50%">
-
-### 🎨 Design Features
+### Design Features
 - **Glassmorphism UI** — Modern frosted glass aesthetic
 - **Dark/Light Theme** — Smooth CSS variable transitions
-- **Responsive** — 3 cards desktop, 2 tablet, 1 mobile
-- **Charts** — Recharts + Chart.js for data visualization
+- **Responsive** — Adaptive grid layouts across all devices
+- **Charts** — Chart.js (Bar, Doughnut, Line) + Recharts for data visualization
 - **Animations** — fadeIn, slideUp, scaleIn, pulse effects
 - **Progress Rings** — SVG circular progress indicators
 - **Protected Routes** — JWT-based auth guards
 
-</td>
-</tr>
-</table>
-
 ---
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        FRONTEND                             │
-│  React 19 • React Router 6 • Axios • Chart.js • Recharts   │
-│  CSS Variables • Glassmorphism • Responsive Grid            │
-├─────────────────────────────────────────────────────────────┤
-│                        BACKEND                              │
-│  Node.js • Express 4 • MongoDB (Mongoose) • JWT • bcrypt    │
-│  RESTful API • Auth Middleware • CRUD Operations            │
-├─────────────────────────────────────────────────────────────┤
-│                      ML SERVICE                             │
-│  Python 3.9+ • Flask • Scikit-learn • NumPy • Pandas        │
-│  Linear Regression • Financial Predictions                  │
-└─────────────────────────────────────────────────────────────┘
+FRONTEND
+  React 19, React Router 6, Axios, Chart.js, Recharts
+  CSS Variables, Glassmorphism, Responsive Grid
+
+BACKEND
+  Node.js, Express 4, MongoDB (Mongoose), JWT, bcrypt
+  RESTful API, Auth Middleware, CRUD Operations
+
+ML SERVICE
+  Python 3.9+, Flask, Scikit-learn, NumPy, Pandas
+  Linear Regression, Financial Predictions
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Smart Finance Insights/
 │
-├── 🔧 backend/
+├── backend/
 │   ├── index.js              # Express server + all models/routes
 │   ├── package.json
 │   └── .env                  # Environment variables
 │
-├── 🎨 frontend/
+├── frontend/
 │   ├── public/
 │   │   └── index.html
 │   ├── src/
@@ -89,14 +79,14 @@ Smart Finance Insights/
 │   │   ├── index.css         # Global CSS variables + animations
 │   │   ├── App.js            # Route definitions + auth guards
 │   │   │
-│   │   ├── 📦 context/
+│   │   ├── context/
 │   │   │   ├── AuthContext.js    # Login, register, logout state
 │   │   │   └── ThemeContext.js   # Dark/light theme toggle
 │   │   │
-│   │   ├── 🔌 services/
+│   │   ├── services/
 │   │   │   └── api.js           # Axios interceptors + API methods
 │   │   │
-│   │   ├── 🧩 components/
+│   │   ├── components/
 │   │   │   ├── Layout.js        # Sidebar + topbar (responsive)
 │   │   │   ├── Icon.js          # 57+ SVG icon paths
 │   │   │   └── ui/
@@ -110,27 +100,29 @@ Smart Finance Insights/
 │   │   │       ├── EmptyState.js     # Placeholder component
 │   │   │       └── LoadingSpinner.js # Animated loader
 │   │   │
-│   │   ├── 📄 pages/
-│   │   │   ├── Register.js        # / — Create account
-│   │   │   ├── Login.js           # /login — Sign in
-│   │   │   ├── Confirmation.js    # /confirmation — Post-login
-│   │   │   ├── Dashboard.js       # /dashboard — Overview
-│   │   │   ├── Income.js          # /income — CRUD
-│   │   │   ├── Expenses.js        # /expenses — CRUD
-│   │   │   ├── Budget.js          # /budget — Limits
-│   │   │   ├── Reports.js         # /reports — Analytics
-│   │   │   ├── SavingsGoals.js    # /savings-goals — CRUD + Charts
-│   │   │   ├── Investments.js     # /investments — CRUD + Portfolio
-│   │   │   ├── AIInsights.js      # /ai-insights — Recommendations
-│   │   │   ├── Profile.js         # /profile — Account info
-│   │   │   └── Settings.js        # /settings — Theme + danger zone
+│   │   ├── pages/
+│   │   │   ├── Register.js          # / — Create account
+│   │   │   ├── Login.js             # /login — Sign in
+│   │   │   ├── Confirmation.js      # /confirmation — Post-login
+│   │   │   ├── Dashboard.js         # /dashboard — Overview + investment widgets
+│   │   │   ├── Income.js            # /income — CRUD
+│   │   │   ├── Expenses.js          # /expenses — CRUD
+│   │   │   ├── Budget.js            # /budget — Limits
+│   │   │   ├── Reports.js           # /reports — Analytics
+│   │   │   ├── FinancialGoalPlanning.js  # /financial-goal-planning — Goal CRUD + analytics + contributions
+│   │   │   ├── Investments.js       # /investments — CRUD + Portfolio
+│   │   │   ├── AssetAllocation.js   # /asset-allocation — Allocation breakdown
+│   │   │   ├── PortfolioAnalytics.js# /portfolio-analytics — Full analytics
+│   │   │   ├── AIInsights.js        # /ai-insights — Recommendations
+│   │   │   ├── Profile.js           # /profile — Account info
+│   │   │   └── Settings.js          # /settings — Theme + danger zone
 │   │   │
-│   │   └── 🔧 utils/
+│   │   └── utils/
 │   │       └── financialHealth.js # Score calculator
 │   │
 │   └── package.json
 │
-├── 🤖 ml/
+├── ml/
 │   ├── app.py                # Flask ML service
 │   ├── requirements.txt      # Python dependencies
 │   └── venv/                 # Virtual environment
@@ -141,7 +133,7 @@ Smart Finance Insights/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -151,18 +143,15 @@ Smart Finance Insights/
 | MongoDB | >= 6.x | [Download](https://www.mongodb.com/try/download/community) |
 | Python | >= 3.9 | [Download](https://www.python.org/downloads/) |
 
-### 1️⃣ Clone & Install
+### 1. Clone & Install
 
 ```bash
-# Clone the repo
 git clone https://github.com/your-username/Smart-Finance-Insights.git
 cd Smart-Finance-Insights
-
-# Install everything (root + backend + frontend)
 npm install
 ```
 
-### 2️⃣ Configure Environment
+### 2. Configure Environment
 
 ```bash
 # Create backend/.env
@@ -171,14 +160,14 @@ JWT_SECRET=your_super_secret_random_key_here
 PORT=4000
 ```
 
-### 3️⃣ Start Development
+### 3. Start Development
 
 ```bash
 # Start both backend (port 4000) and frontend (port 3000)
 npm start
 ```
 
-### 4️⃣ (Optional) ML Service
+### 4. (Optional) ML Service
 
 ```bash
 cd ml
@@ -190,9 +179,9 @@ python app.py              # Runs on port 5000
 
 ---
 
-## 📊 API Endpoints
+## API Endpoints
 
-### 🔐 Authentication
+### Authentication
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -200,81 +189,106 @@ python app.py              # Runs on port 5000
 | `POST` | `/api/login` | Get JWT token |
 | `GET` | `/api/health` | Health check |
 
-### 📈 Dashboard
+### Dashboard
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/dashboard/summary` | Income, expenses, savings, budget |
 | `GET` | `/api/dashboard/recent-transactions` | Latest 5 transactions |
 
-### 💵 Income
+### Income
 
 | Method | Endpoint | Body |
 |--------|----------|------|
 | `GET` | `/api/income` | — |
-| `POST` | `/api/income` | `{ amount, source, date, description }` |
-| `PUT` | `/api/income/:id` | `{ amount, source, date, description }` |
+| `POST` | `/api/income` | `{ amount, source, date, category }` |
+| `PUT` | `/api/income/:id` | Same as above |
 | `DELETE` | `/api/income/:id` | — |
 
-### 💸 Expenses
+### Expenses
 
 | Method | Endpoint | Body |
 |--------|----------|------|
 | `GET` | `/api/expenses` | — |
-| `POST` | `/api/expenses` | `{ amount, category, date, description }` |
-| `PUT` | `/api/expenses/:id` | `{ amount, category, date, description }` |
+| `POST` | `/api/expenses` | `{ amount, category, date, description, paymentMethod }` |
+| `PUT` | `/api/expenses/:id` | Same as above |
 | `DELETE` | `/api/expenses/:id` | — |
 
-### 🎯 Goals
+### Budget
+
+| Method | Endpoint | Body |
+|--------|----------|------|
+| `GET` | `/api/budget` | — |
+| `POST` | `/api/budget` | `{ category, limit, month }` |
+
+### Goals
 
 | Method | Endpoint | Body |
 |--------|----------|------|
 | `GET` | `/api/goals` | — |
-| `POST` | `/api/goals` | `{ goalName, category, targetAmount, savedAmount, monthlySaving, targetDate }` |
+| `POST` | `/api/goals` | `{ goalName, category, targetAmount, savedAmount, monthlySaving, targetDate, priority }` |
 | `PUT` | `/api/goals/:id` | Same as above |
 | `DELETE` | `/api/goals/:id` | — |
+| `POST` | `/api/goals/:id/contributions` | `{ amount, date, note }` |
+| `GET` | `/api/goals/analytics` | Returns summary, achievements, recommendations, monthly data, category distribution |
 
-### 💼 Investments
+### Investments
 
 | Method | Endpoint | Body |
 |--------|----------|------|
 | `GET` | `/api/investments` | — |
-| `POST` | `/api/investments` | `{ name, type, category, amount, investedDate, expectedReturns, status, notes }` |
+| `POST` | `/api/investments` | `{ name, type, category, amount, currentValue, investedDate, expectedReturns, status, notes }` |
 | `PUT` | `/api/investments/:id` | Same as above |
 | `DELETE` | `/api/investments/:id` | — |
+| `GET` | `/api/investments/analytics` | Returns type/category breakdown, performance, diversification score |
 
-### 🧠 ML Service
+### Portfolio Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/portfolio/analytics` | Combined investment + goal analytics, risk score, monthly growth, top/worst performers |
+
+### ML Service
 
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
 | `GET` | `/health` | — | Service health |
 | `POST` | `/predict` | `{ amount }` | Predict future value |
 
+### Data Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `DELETE` | `/api/clear-data` | Clear all user data (income, expenses, budgets, goals, investments) |
+
 ---
 
-## 🗺️ Frontend Routes
+## Frontend Routes
 
 | Route | Page | Access | Description |
 |-------|------|--------|-------------|
 | `/` | Register | Public | Create a new account |
 | `/login` | Login | Public | Sign in |
-| `/dashboard` | Dashboard | Protected | Financial overview |
+| `/confirmation` | Confirmation | Protected | Post-login confirmation |
+| `/dashboard` | Dashboard | Protected | Financial overview + investment widgets |
 | `/income` | Income | Protected | Income CRUD |
 | `/expenses` | Expenses | Protected | Expense CRUD |
 | `/budget` | Budget | Protected | Budget limits |
 | `/reports` | Reports | Protected | Financial analytics |
-| `/savings-goals` | Savings Goals | Protected | Goal tracking |
-| `/investments` | Investments | Protected | Portfolio management |
+| `/financial-goal-planning` | Financial Goal Planning | Protected | Goal CRUD, contributions, analytics, achievements |
+| `/investments` | Investments | Protected | Portfolio management + CRUD |
+| `/asset-allocation` | Asset Allocation | Protected | Allocation breakdown by type/category |
+| `/portfolio-analytics` | Portfolio Analytics | Protected | Comprehensive investment + goal analytics |
 | `/ai-insights` | AI Insights | Protected | Recommendations |
 | `/profile` | Profile | Protected | Account details |
 | `/settings` | Settings | Protected | Theme + preferences |
 
 ---
 
-## 🧩 Data Models
+## Data Models
 
 ```javascript
-// 👤 User
+// User
 {
   name:        String (required),
   email:       String (required, unique),
@@ -282,47 +296,53 @@ python app.py              # Runs on port 5000
   createdAt:   Date
 }
 
-// 💵 Income
+// Income
 {
   userId:      ObjectId (ref: User, required),
   amount:      Number (required),
-  source:      String (required),     // Salary, Freelancing, Business, etc.
+  source:      String (required),
+  category:    String,
   date:        Date,
   description: String
 }
 
-// 💸 Expense
+// Expense
 {
-  userId:      ObjectId (ref: User, required),
-  amount:      Number (required),
-  category:    String (required),     // Food, Transport, Shopping, etc.
-  date:        Date,
-  description: String
+  userId:        ObjectId (ref: User, required),
+  amount:        Number (required),
+  category:      String (required),
+  date:          Date,
+  description:   String,
+  paymentMethod: String
 }
 
-// 🎯 Goal
+// Goal
 {
   userId:        ObjectId (ref: User, required),
   goalName:      String (required),
-  category:      String (required),   // Emergency Fund, Travel, Education, etc.
+  category:      String (required),
   targetAmount:  Number (required),
   savedAmount:   Number,
   monthlySaving: Number,
   targetDate:    Date (required),
+  priority:      String (enum: high/medium/low, default: medium),
+  status:        String (enum: active/achieved/paused/overdue, default: active),
+  contributions: [{ amount: Number, date: Date, note: String }],
   createdAt:     Date,
   updatedAt:     Date
 }
 
-// 💼 Investment
+// Investment
 {
   userId:          ObjectId (ref: User, required),
   name:            String (required),
-  type:            String (required),   // Stocks, MF, FD, PPF, Crypto, etc.
-  category:        String (required),   // Equity, Debt, Hybrid, etc.
+  type:            String (required),
+  category:        String (required),
   amount:          Number (required),
+  currentValue:    Number (defaults to amount),
   investedDate:    Date,
   expectedReturns: Number,
-  status:          String,              // active, closed, paused
+  status:          String (active/closed/paused),
   notes:           String,
   createdAt:       Date,
   updatedAt:       Date
@@ -331,7 +351,7 @@ python app.py              # Runs on port 5000
 
 ---
 
-## 🎨 Design System
+## Design System
 
 ### Color Palette
 
@@ -347,13 +367,13 @@ python app.py              # Runs on port 5000
 ### Component Library
 
 ```
-Button      → 5 variants (primary, secondary, danger, success, ghost)
-Card        → Glassmorphism with hover glow effect
-Input       → Focus glow, error states, number/date/text types
-Select      → Styled dropdown with options
-Badge       → 6 colors (success, danger, warning, info, purple, teal)
+Button       → 5 variants (primary, secondary, danger, success, ghost)
+Card         → Glassmorphism with hover glow effect
+Input        → Focus glow, error states, number/date/text types
+Select       → Styled dropdown with options
+Badge        → 6 colors (success, danger, warning, info, purple, teal)
 ProgressRing → SVG circular progress with customizable color/size
-EmptyState  → Icon + message + action button
+EmptyState   → Icon + message + action button
 LoadingSpinner → Animated pulse spinner
 SemiCircleGauge → Gauge for health scores
 ```
@@ -371,54 +391,7 @@ shimmer     → 2s infinite     /* Skeleton loading */
 
 ---
 
-## 🔐 Authentication Flow
-
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ Register │───▶│  Login   │───▶│   JWT    │───▶│  API     │
-│          │    │          │    │  Token   │    │ Requests │
-└──────────┘    └──────────┘    └──────────┘    └──────────┘
-     │                              │                │
-     │           ┌──────────┐       │           ┌────▼────┐
-     │           │  bcrypt  │       │           │ Axios   │
-     └──────────▶│  Hash    │       │           │ Header  │
-                 └──────────┘       │           │ Attach  │
-                                    │           └─────────┘
-                                    │
-                              ┌─────▼─────┐
-                              │ localStorage│
-                              │ (token)     │
-                              └─────────────┘
-```
-
-**Flow:**
-1. User registers → password hashed with bcrypt → saved to MongoDB
-2. User logs in → bcrypt compare → JWT token returned
-3. Token stored in localStorage → Axios interceptor attaches to every request
-4. 401 response → auto-logout → redirect to `/login`
-
----
-
-## 🧠 AI Recommendations Engine
-
-The AI Insights page uses a **rule-based recommendation engine** that analyzes:
-
-| Rule | Trigger | Priority |
-|------|---------|----------|
-| Highest Spending Category | Top expense category identified | Critical |
-| Savings Rate | Below 20% of income | Critical |
-| Budget Usage | Exceeds 80% of limit | Critical |
-| Expense Trend | Increasing month-over-month | Moderate |
-| Income Trend | Decreasing month-over-month | Moderate |
-| Financial Health | Score below 60 | Moderate |
-| Goal Progress | Behind schedule | Moderate |
-| Spending vs Income | Ratio above 80% | Good |
-
-**Output:** Up to 5 prioritized recommendations sorted by severity (critical → moderate → good).
-
----
-
-## 📈 Investment Categories
+## Investment Categories
 
 | Type | Color | Examples |
 |------|-------|----------|
@@ -435,7 +408,7 @@ The AI Insights page uses a **rule-based recommendation engine** that analyzes:
 
 ---
 
-## 🛠️ Development Commands
+## Development Commands
 
 ```bash
 # Start everything (backend + frontend)
@@ -456,7 +429,7 @@ cd frontend && npm test
 
 ---
 
-## 📱 Responsive Breakpoints
+## Responsive Breakpoints
 
 | Device | Layout | Cards per Row |
 |--------|--------|---------------|
@@ -466,7 +439,7 @@ cd frontend && npm test
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -476,18 +449,6 @@ cd frontend && npm test
 
 ---
 
-## 📄 License
+## License
 
 This project is **private** and not publicly licensed.
-
----
-
-<div align="center">
-
-**Built with ❤️ for personal finance management**
-
-![Made with React](https://img.shields.io/badge/Made_with-React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![Made with Node.js](https://img.shields.io/badge/Made_with-Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![Made with MongoDB](https://img.shields.io/badge/Made_with-MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
-
-</div>

@@ -64,6 +64,8 @@ export const goalAPI = {
   create: (data) => api.post('/api/goals', data),
   update: (id, data) => api.put(`/api/goals/${id}`, data),
   delete: (id) => api.delete(`/api/goals/${id}`),
+  addContribution: (id, data) => api.post(`/api/goals/${id}/contributions`, data),
+  getAnalytics: () => api.get('/api/goals/analytics'),
 };
 
 export const investmentAPI = {
@@ -71,6 +73,15 @@ export const investmentAPI = {
   create: (data) => api.post('/api/investments', data),
   update: (id, data) => api.put(`/api/investments/${id}`, data),
   delete: (id) => api.delete(`/api/investments/${id}`),
+  getAnalytics: () => api.get('/api/investments/analytics'),
+};
+
+export const portfolioAPI = {
+  getAnalytics: () => api.get('/api/portfolio/analytics'),
+};
+
+export const settingsAPI = {
+  clearAllData: () => api.delete('/api/clear-data'),
 };
 
 export default api;

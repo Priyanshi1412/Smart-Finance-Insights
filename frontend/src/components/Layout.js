@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { dashboardAPI } from '../services/api';
-import { calculateFinancialHealth } from '../utils/financialHealth';
+import { useFinancialHealth } from '../context/FinancialHealthContext';
 import Icon, { icons } from './Icon';
 import ProgressRing from './ui/ProgressRing';
 
@@ -13,8 +12,10 @@ const menu = [
   { label: 'Expenses', path: '/expenses', icon: icons.expenses },
   { label: 'Budget', path: '/budget', icon: icons.budget },
   { label: 'Reports', path: '/reports', icon: icons.reports },
-  { label: 'Savings Goals', path: '/savings-goals', icon: icons.savings },
+  { label: 'Goal Planning', path: '/financial-goal-planning', icon: icons.target },
   { label: 'Investments', path: '/investments', icon: icons.investments },
+  { label: 'Portfolio Analytics', path: '/portfolio-analytics', icon: icons.barChart },
+  { label: 'Asset Allocation', path: '/asset-allocation', icon: icons.pieChart },
   { label: 'AI Insights', path: '/ai-insights', icon: icons.brain },
 ];
 
@@ -28,9 +29,9 @@ export default function Layout({ children, title, centerContent = false }) {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { health } = useFinancialHealth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [health, setHealth] = useState(null);
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', {
@@ -50,21 +51,6 @@ export default function Layout({ children, title, centerContent = false }) {
   }, []);
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
-
-  useEffect(() => {
-    if (!user) return;
-    let mounted = true;
-    const load = async () => {
-      try {
-        const res = await dashboardAPI.getSummary();
-        if (mounted) setHealth(calculateFinancialHealth(res.data.totalIncome, res.data.totalExpenses));
-      } catch {}
-    };
-    load();
-    const interval = setInterval(load, 30000);
-    window.addEventListener('focus', load);
-    return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', load); };
-  }, [user, location.pathname]);
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()

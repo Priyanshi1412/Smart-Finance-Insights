@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -6,16 +7,17 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Badge from '../components/ui/Badge';
 import Icon, { icons } from '../components/Icon';
+import ProgressRing from '../components/ui/ProgressRing';
 import EmptyState from '../components/ui/EmptyState';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { investmentAPI } from '../services/api';
 import {
   Chart as ChartJS,
-  ArcElement, Tooltip, Legend,
+  ArcElement, Tooltip as ChartTooltip, Legend as ChartLegend,
 } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, ChartTooltip, ChartLegend);
 
 const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -66,8 +68,20 @@ const TYPE_COLORS = {
   'Other': '#6B7280',
 };
 
+const CATEGORY_COLORS = {
+  'Equity': '#3B82F6',
+  'Debt': '#10B981',
+  'Hybrid': '#8B5CF6',
+  'Commodity': '#EAB308',
+  'Real Estate': '#EF4444',
+  'Digital': '#F97316',
+  'Government': '#06B6D4',
+  'Corporate': '#EC4899',
+  'Other': '#6B7280',
+};
+
 const emptyForm = {
-  name: '', type: '', category: '', amount: '',
+  name: '', type: '', category: '', amount: '', currentValue: '',
   investedDate: new Date().toISOString().split('T')[0],
   expectedReturns: '', status: 'active', notes: ''
 };
@@ -113,18 +127,30 @@ const s = {
   },
   modal: {
     background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)',
-    padding: '28px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto',
+    padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto',
     animation: 'scaleIn 0.25s ease-out', boxShadow: 'var(--shadow-xl)',
   },
   modalTitle: { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '20px' },
   modalActions: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' },
   sectionTitle: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' },
   twoCol: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px', marginBottom: '28px' },
+  threeCol: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' },
   analyticsRow: { display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' },
   analyticsLabel: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', minWidth: '120px', flexShrink: 0 },
   analyticsTrack: { flex: 1, height: 10, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' },
   analyticsFill: { height: '100%', borderRadius: 999, transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)' },
   analyticsPct: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: '44px', textAlign: 'right' },
+  perfTable: { width: '100%', borderCollapse: 'collapse' },
+  perfTh: { fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '10px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)' },
+  perfTd: { fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' },
+  perfRow: { transition: 'background var(--transition-fast)' },
+  roiCard: {
+    background: 'var(--bg-glass)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)',
+    padding: '16px 18px', transition: 'all var(--transition-fast)',
+  },
+  roiLabel: { fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' },
+  roiValue: { fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' },
+  roiFormula: { fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' },
 };
 
 function SummaryCard({ icon, amount, label, desc, color, delay }) {
@@ -152,8 +178,10 @@ function SummaryCard({ icon, amount, label, desc, color, delay }) {
 function InvestmentCard({ investment, onEdit, onDelete }) {
   const [hover, setHover] = useState(false);
   const color = TYPE_COLORS[investment.type] || '#6B7280';
-  const returns = investment.expectedReturns || 0;
-  const isPositive = returns >= 0;
+  const currentVal = investment.currentValue != null ? investment.currentValue : (investment.amount || 0);
+  const profit = currentVal - (investment.amount || 0);
+  const returnPct = investment.amount > 0 ? ((profit / investment.amount) * 100) : 0;
+  const isProfit = profit >= 0;
 
   return (
     <div
@@ -178,19 +206,28 @@ function InvestmentCard({ investment, onEdit, onDelete }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={s.investmentName}>{investment.name}</div>
-          <div style={s.investmentType}>{investment.type} • {investment.category}</div>
+          <div style={s.investmentType}>{investment.type} &bull; {investment.category}</div>
         </div>
       </div>
 
-      <div style={{ fontSize: '1.3rem', fontWeight: 800, color, marginBottom: '14px' }}>
-        {fmt(investment.amount)}
+      <div style={{ fontSize: '1.3rem', fontWeight: 800, color, marginBottom: '4px' }}>
+        {fmt(currentVal)}
+      </div>
+      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+        Invested: {fmt(investment.amount)}
       </div>
 
       <div style={s.investmentStats}>
         <div style={s.investmentStatItem}>
-          <span style={s.investmentStatLabel}>Expected Returns</span>
-          <span style={{ ...s.investmentStatValue, color: isPositive ? 'var(--success)' : 'var(--danger)' }}>
-            {isPositive ? '+' : ''}{returns}%
+          <span style={s.investmentStatLabel}>Profit/Loss</span>
+          <span style={{ ...s.investmentStatValue, color: isProfit ? 'var(--success)' : 'var(--danger)' }}>
+            {isProfit ? '+' : ''}{fmt(profit)}
+          </span>
+        </div>
+        <div style={s.investmentStatItem}>
+          <span style={s.investmentStatLabel}>Return %</span>
+          <span style={{ ...s.investmentStatValue, color: isProfit ? 'var(--success)' : 'var(--danger)' }}>
+            {isProfit ? '+' : ''}{returnPct.toFixed(2)}%
           </span>
         </div>
         <div style={s.investmentStatItem}>
@@ -204,7 +241,7 @@ function InvestmentCard({ investment, onEdit, onDelete }) {
           </Badge>
         </div>
         {investment.notes && (
-          <div style={s.investmentStatItem}>
+          <div style={{ ...s.investmentStatItem, gridColumn: 'span 2' }}>
             <span style={s.investmentStatLabel}>Notes</span>
             <span style={{ ...s.investmentStatValue, fontSize: '0.82rem' }}>{investment.notes}</span>
           </div>
@@ -235,6 +272,7 @@ function InvestmentModal({ show, onClose, onSave, editInvestment }) {
         type: editInvestment.type || '',
         category: editInvestment.category || '',
         amount: editInvestment.amount || '',
+        currentValue: editInvestment.currentValue ?? '',
         investedDate: editInvestment.investedDate ? new Date(editInvestment.investedDate).toISOString().split('T')[0] : '',
         expectedReturns: editInvestment.expectedReturns || '',
         status: editInvestment.status || 'active',
@@ -255,11 +293,14 @@ function InvestmentModal({ show, onClose, onSave, editInvestment }) {
     }
     setLoading(true);
     try {
+      const amount = Number(form.amount);
+      const currentValue = form.currentValue !== '' ? Number(form.currentValue) : amount;
       await onSave({
         name: form.name,
         type: form.type,
         category: form.category,
-        amount: Number(form.amount),
+        amount,
+        currentValue,
         investedDate: form.investedDate,
         expectedReturns: Number(form.expectedReturns || 0),
         status: form.status,
@@ -320,8 +361,8 @@ function InvestmentModal({ show, onClose, onSave, editInvestment }) {
               value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })}
             />
             <Input
-              label="Expected Returns (%)" type="number" placeholder="0"
-              value={form.expectedReturns} onChange={(e) => setForm({ ...form, expectedReturns: e.target.value })}
+              label="Current Value" type="number" placeholder="0"
+              value={form.currentValue} onChange={(e) => setForm({ ...form, currentValue: e.target.value })}
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
@@ -335,6 +376,10 @@ function InvestmentModal({ show, onClose, onSave, editInvestment }) {
               options={STATUS_OPTIONS}
             />
           </div>
+          <Input
+            label="Expected Returns (%)" type="number" placeholder="0"
+            value={form.expectedReturns} onChange={(e) => setForm({ ...form, expectedReturns: e.target.value })}
+          />
           <Input
             label="Notes (Optional)" placeholder="Add any notes about this investment"
             value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -351,18 +396,25 @@ function InvestmentModal({ show, onClose, onSave, editInvestment }) {
 
 export default function Investments() {
   const [investments, setInvestments] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editInvestment, setEditInvestment] = useState(null);
 
   const fetchInvestments = useCallback(async () => {
     try {
-      const res = await investmentAPI.getAll();
-      setInvestments(res.data);
+      const invRes = await investmentAPI.getAll();
+      setInvestments(invRes.data);
     } catch (err) {
       console.error('Failed to fetch investments:', err);
     } finally {
       setLoading(false);
+    }
+    try {
+      const analyticsRes = await investmentAPI.getAnalytics();
+      setAnalytics(analyticsRes.data);
+    } catch (err) {
+      console.error('Failed to fetch analytics:', err);
     }
   }, []);
 
@@ -378,6 +430,10 @@ export default function Investments() {
     }
     setShowModal(false);
     setEditInvestment(null);
+    try {
+      const analyticsRes = await investmentAPI.getAnalytics();
+      setAnalytics(analyticsRes.data);
+    } catch {}
   };
 
   const handleEdit = (investment) => {
@@ -390,52 +446,114 @@ export default function Investments() {
     try {
       await investmentAPI.delete(id);
       setInvestments((prev) => prev.filter((inv) => inv._id !== id));
+      try {
+        const analyticsRes = await investmentAPI.getAnalytics();
+        setAnalytics(analyticsRes.data);
+      } catch {}
     } catch (err) {
       console.error('Failed to delete investment:', err);
     }
   };
 
   const stats = useMemo(() => {
-    const active = investments.filter((inv) => inv.status === 'active');
-    const totalInvested = investments.reduce((s, inv) => s + (inv.amount || 0), 0);
-    const totalReturns = investments.reduce((s, inv) => {
-      const returns = inv.expectedReturns || 0;
-      return s + (inv.amount * returns / 100);
-    }, 0);
-    const currentValue = totalInvested + totalReturns;
-    const bestPerformer = [...investments].sort((a, b) => (b.expectedReturns || 0) - (a.expectedReturns || 0))[0];
+    if (analytics) return analytics.summary;
+    const totalInvested = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const totalCurrentValue = investments.reduce((sum, inv) => sum + (inv.currentValue != null ? inv.currentValue : (inv.amount || 0)), 0);
+    const totalReturns = totalCurrentValue - totalInvested;
+    const returnPct = totalInvested > 0 ? ((totalReturns / totalInvested) * 100) : 0;
     return {
-      totalInvested,
-      currentValue,
-      totalReturns,
-      activeCount: active.length,
+      totalInvested, totalCurrentValue, totalReturns,
+      returnPct: Math.round(returnPct * 100) / 100,
+      activeCount: investments.filter(i => i.status === 'active').length,
       totalCount: investments.length,
-      bestPerformer,
     };
-  }, [investments]);
+  }, [analytics, investments]);
 
   const typeBreakdown = useMemo(() => {
+    if (analytics) return analytics.typeBreakdown;
     const breakdown = {};
     investments.forEach((inv) => {
-      if (!breakdown[inv.type]) {
-        breakdown[inv.type] = { type: inv.type, total: 0, count: 0 };
-      }
-      breakdown[inv.type].total += inv.amount || 0;
+      if (!breakdown[inv.type]) breakdown[inv.type] = { type: inv.type, invested: 0, currentValue: 0, count: 0 };
+      breakdown[inv.type].invested += inv.amount || 0;
+      breakdown[inv.type].currentValue += inv.currentValue != null ? inv.currentValue : (inv.amount || 0);
       breakdown[inv.type].count += 1;
     });
-    return Object.values(breakdown).sort((a, b) => b.total - a.total);
-  }, [investments]);
+    return Object.values(breakdown).sort((a, b) => b.currentValue - a.currentValue);
+  }, [analytics, investments]);
+
+  const categoryBreakdown = useMemo(() => {
+    if (analytics) return analytics.categoryBreakdown;
+    const breakdown = {};
+    investments.forEach((inv) => {
+      if (!breakdown[inv.category]) breakdown[inv.category] = { category: inv.category, invested: 0, currentValue: 0, count: 0 };
+      breakdown[inv.category].invested += inv.amount || 0;
+      breakdown[inv.category].currentValue += inv.currentValue != null ? inv.currentValue : (inv.amount || 0);
+      breakdown[inv.category].count += 1;
+    });
+    return Object.values(breakdown).sort((a, b) => b.currentValue - a.currentValue);
+  }, [analytics, investments]);
+
+  const performance = useMemo(() => {
+    if (analytics) return analytics.performance;
+    return investments.map(inv => {
+      const curr = inv.currentValue != null ? inv.currentValue : (inv.amount || 0);
+      const profit = curr - (inv.amount || 0);
+      const retPct = inv.amount > 0 ? ((profit / inv.amount) * 100) : 0;
+      return {
+        _id: inv._id, name: inv.name, type: inv.type, category: inv.category,
+        amount: inv.amount, currentValue: curr, profit, returnPct: Math.round(retPct * 100) / 100,
+        status: inv.status, investedDate: inv.investedDate,
+      };
+    }).sort((a, b) => b.returnPct - a.returnPct);
+  }, [analytics, investments]);
+
+  const diversification = useMemo(() => {
+    if (analytics?.diversification) return analytics.diversification;
+    const numTypes = typeBreakdown.length;
+    const numCategories = categoryBreakdown.length;
+    const maxTypeAlloc = stats.totalCurrentValue > 0
+      ? Math.max(...typeBreakdown.map(t => (t.currentValue / stats.totalCurrentValue) * 100))
+      : 0;
+    const concentrationRatio = Math.round(maxTypeAlloc * 100) / 100;
+    const score = numTypes === 0 ? 0 : Math.min(100, Math.round(
+      (Math.min(numTypes, 6) / 6) * 60 + (numCategories >= 3 ? 20 : numCategories * 6.67) + (concentrationRatio < 40 ? 20 : concentrationRatio < 60 ? 10 : 0)
+    ));
+    return {
+      score,
+      label: score >= 70 ? 'Well Diversified' : score >= 40 ? 'Moderately Diversified' : 'Concentrated',
+      numTypes, numCategories, concentrationRatio,
+    };
+  }, [analytics, typeBreakdown, categoryBreakdown, stats]);
+
+  const chartData = useMemo(() => {
+    return performance.slice(0, 8).map(p => ({
+      name: p.name.length > 14 ? p.name.slice(0, 12) + '...' : p.name,
+      invested: p.amount,
+      currentValue: p.currentValue,
+    }));
+  }, [performance]);
 
   const doughnutData = useMemo(() => ({
     labels: typeBreakdown.map((t) => t.type),
     datasets: [{
-      data: typeBreakdown.map((t) => t.total),
+      data: typeBreakdown.map((t) => t.currentValue),
       backgroundColor: typeBreakdown.map((t) => (TYPE_COLORS[t.type] || '#6B7280') + 'CC'),
       borderColor: '#111827',
       borderWidth: 3,
       hoverOffset: 8,
     }],
   }), [typeBreakdown]);
+
+  const categoryDoughnutData = useMemo(() => ({
+    labels: categoryBreakdown.map((c) => c.category),
+    datasets: [{
+      data: categoryBreakdown.map((c) => c.currentValue),
+      backgroundColor: categoryBreakdown.map((c) => (CATEGORY_COLORS[c.category] || '#6B7280') + 'CC'),
+      borderColor: '#111827',
+      borderWidth: 3,
+      hoverOffset: 8,
+    }],
+  }), [categoryBreakdown]);
 
   const doughnutOptions = {
     responsive: true,
@@ -448,7 +566,8 @@ export default function Investments() {
         borderColor: '#334155', borderWidth: 1, cornerRadius: 8, padding: 12,
         callbacks: {
           label: (ctx) => {
-            const pct = stats.totalInvested > 0 ? ((ctx.raw / stats.totalInvested) * 100).toFixed(1) : 0;
+            const total = ctx.dataset.data.reduce((s, v) => s + v, 0);
+            const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
             return `${ctx.label}: ${fmt(ctx.raw)} (${pct}%)`;
           },
         },
@@ -456,10 +575,20 @@ export default function Investments() {
     },
   };
 
+  const barTooltipStyle = {
+    contentStyle: {
+      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+    },
+  };
+
   const openNewInvestment = () => {
     setEditInvestment(null);
     setShowModal(true);
   };
+
+  const profitColor = stats.totalReturns >= 0 ? 'var(--success)' : 'var(--danger)';
+  const divColor = diversification.score >= 70 ? 'var(--success)' : diversification.score >= 40 ? 'var(--warning)' : 'var(--danger)';
 
   if (loading) {
     return (
@@ -483,9 +612,9 @@ export default function Investments() {
       {/* Summary Cards */}
       <div style={s.statsGrid}>
         <SummaryCard icon={icons.investments} amount={fmt(stats.totalInvested)} label="Total Invested" desc={`Across ${stats.totalCount} investments`} color="var(--purple)" delay="0s" />
-        <SummaryCard icon={icons.trendingUp} amount={fmt(stats.currentValue)} label="Current Value" desc={`${stats.totalReturns >= 0 ? '+' : ''}${fmt(stats.totalReturns)} returns`} color="var(--success)" delay="0.05s" />
+        <SummaryCard icon={icons.trendingUp} amount={fmt(stats.totalCurrentValue)} label="Current Value" desc={`${stats.totalReturns >= 0 ? '+' : ''}${fmt(stats.totalReturns)} overall returns`} color="var(--success)" delay="0.05s" />
         <SummaryCard icon={icons.activity} amount={`${stats.activeCount}`} label="Active Investments" desc={`${stats.totalCount - stats.activeCount} closed/paused`} color="var(--accent)" delay="0.1s" />
-        <SummaryCard icon={icons.target} amount={stats.bestPerformer ? `${stats.bestPerformer.expectedReturns || 0}%` : 'N/A'} label="Best Performer" desc={stats.bestPerformer?.name || 'No investments yet'} color="var(--warning)" delay="0.15s" />
+        <SummaryCard icon={icons.target} amount={`${stats.returnPct >= 0 ? '+' : ''}${stats.returnPct}%`} label="Overall Return" desc={stats.returnPct >= 0 ? 'Portfolio is growing' : 'Portfolio is declining'} color={profitColor} delay="0.15s" />
       </div>
 
       {investments.length === 0 ? (
@@ -509,48 +638,205 @@ export default function Investments() {
             ))}
           </div>
 
-          {/* Two Column Layout: Chart + Type Breakdown */}
+          {/* ===== MODULE 2: Asset Allocation & Return Calculation ===== */}
+
+          {/* ROI Summary - All Calculations */}
+          <div style={{ marginBottom: '8px' }}>
+            <h3 style={{ ...s.sectionTitle, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon path={icons.barChart} size={20} /> Return on Investment (ROI) Summary
+            </h3>
+          </div>
+          <div style={s.threeCol}>
+            <div style={s.roiCard}>
+              <div style={s.roiLabel}>Total Investment</div>
+              <div style={s.roiValue}>{fmt(stats.totalInvested)}</div>
+              <div style={s.roiFormula}>Sum of all invested amounts</div>
+            </div>
+            <div style={s.roiCard}>
+              <div style={s.roiLabel}>Current Portfolio Value</div>
+              <div style={{ ...s.roiValue, color: 'var(--success)' }}>{fmt(stats.totalCurrentValue)}</div>
+              <div style={s.roiFormula}>Sum of all current values</div>
+            </div>
+            <div style={s.roiCard}>
+              <div style={s.roiLabel}>Profit / Loss</div>
+              <div style={{ ...s.roiValue, color: profitColor }}>{stats.totalReturns >= 0 ? '+' : ''}{fmt(stats.totalReturns)}</div>
+              <div style={s.roiFormula}>Current Value - Total Invested</div>
+            </div>
+            <div style={s.roiCard}>
+              <div style={s.roiLabel}>Return Percentage (ROI)</div>
+              <div style={{ ...s.roiValue, color: profitColor }}>{stats.returnPct >= 0 ? '+' : ''}{stats.returnPct}%</div>
+              <div style={s.roiFormula}>(Profit / Total Invested) x 100</div>
+            </div>
+            <div style={s.roiCard}>
+              <div style={s.roiLabel}>Total Asset Classes</div>
+              <div style={s.roiValue}>{typeBreakdown.length}</div>
+              <div style={s.roiFormula}>Different investment types</div>
+            </div>
+            <div style={s.roiCard}>
+              <div style={s.roiLabel}>Best Performer</div>
+              <div style={{ ...s.roiValue, color: 'var(--success)', fontSize: '1rem' }}>
+                {analytics?.bestPerformer?.name || performance[0]?.name || 'N/A'}
+              </div>
+              <div style={s.roiFormula}>
+                {analytics?.bestPerformer != null
+                  ? `${fmt(analytics.bestPerformer.amount)} invested`
+                  : performance[0] ? `${fmt(performance[0].amount)} invested` : ''}
+              </div>
+            </div>
+          </div>
+
+          {/* Portfolio Performance Chart */}
+          <Card style={{ marginBottom: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon path={icons.barChart} size={18} />
+              </div>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Invested vs Current Value</h2>
+            </div>
+            <div style={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip {...barTooltipStyle} formatter={(value) => [fmt(value)]} />
+                  <Legend wrapperStyle={{ fontSize: '0.8rem', color: 'var(--text-muted)' }} />
+                  <Bar dataKey="invested" fill="#8B5CF6" name="Invested" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="currentValue" fill="#10B981" name="Current Value" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          {/* Asset Allocation by Type + Asset Allocation by Category */}
           <div style={s.twoCol}>
-            {/* Portfolio Allocation Chart */}
+            {/* Asset Allocation by Type */}
             <Card>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
                 <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon path={icons.pieChart} size={18} />
                 </div>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Portfolio Allocation</h2>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Allocation by Type</h2>
               </div>
               <div style={{ height: 220, display: 'flex', justifyContent: 'center' }}>
                 <Doughnut data={doughnutData} options={doughnutOptions} />
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '16px', marginTop: '16px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '14px', marginTop: '16px' }}>
                 {typeBreakdown.map((t, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: TYPE_COLORS[t.type] || '#6B7280', flexShrink: 0 }} />
                     <span style={{ color: 'var(--text-muted)' }}>{t.type}</span>
-                    <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{((t.total / stats.totalInvested) * 100).toFixed(0)}%</span>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{((t.currentValue / (stats.totalCurrentValue || 1)) * 100).toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
             </Card>
 
-            {/* Type Breakdown */}
+            {/* Asset Allocation by Category */}
             <Card>
-              <h3 style={s.sectionTitle}>Type Breakdown</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--teal-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.pieChart} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Allocation by Category</h2>
+              </div>
+              <div style={{ height: 220, display: 'flex', justifyContent: 'center' }}>
+                <Doughnut data={categoryDoughnutData} options={doughnutOptions} />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '14px', marginTop: '16px' }}>
+                {categoryBreakdown.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: CATEGORY_COLORS[c.category] || '#6B7280', flexShrink: 0 }} />
+                    <span style={{ color: 'var(--text-muted)' }}>{c.category}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{((c.currentValue / (stats.totalCurrentValue || 1)) * 100).toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Portfolio Diversification + Type Performance Breakdown */}
+          <div style={s.twoCol}>
+            {/* Portfolio Diversification Analysis */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.shield} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Portfolio Diversification</h2>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px' }}>
+                <ProgressRing percent={diversification.score} size={100} strokeWidth={8} color={divColor} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Diversification Score</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: divColor }}>{diversification.score}/100</div>
+                  <Badge color={diversification.score >= 70 ? 'success' : diversification.score >= 40 ? 'warning' : 'danger'}>
+                    {diversification.label}
+                  </Badge>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={s.roiCard}>
+                  <div style={s.roiLabel}>Asset Classes</div>
+                  <div style={{ ...s.roiValue, fontSize: '1.1rem' }}>{diversification.numTypes}</div>
+                </div>
+                <div style={s.roiCard}>
+                  <div style={s.roiLabel}>Categories Used</div>
+                  <div style={{ ...s.roiValue, fontSize: '1.1rem' }}>{diversification.numCategories}</div>
+                </div>
+                <div style={s.roiCard}>
+                  <div style={s.roiLabel}>Max Allocation</div>
+                  <div style={{ ...s.roiValue, fontSize: '1.1rem', color: diversification.concentrationRatio > 60 ? 'var(--danger)' : 'var(--text-primary)' }}>
+                    {diversification.concentrationRatio}%
+                  </div>
+                </div>
+                <div style={s.roiCard}>
+                  <div style={s.roiLabel}>Total Investments</div>
+                  <div style={{ ...s.roiValue, fontSize: '1.1rem' }}>{stats.totalCount}</div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  {diversification.score >= 70
+                    ? 'Your portfolio is well diversified across multiple asset classes. This reduces risk and provides balanced growth potential.'
+                    : diversification.score >= 40
+                    ? 'Your portfolio has moderate diversification. Consider adding investments in different asset classes to reduce concentration risk.'
+                    : 'Your portfolio is concentrated in few asset classes. Diversifying across Stocks, Bonds, Gold, and Real Estate can reduce risk significantly.'}
+                </div>
+              </div>
+            </Card>
+
+            {/* Type Performance Breakdown */}
+            <Card>
+              <h3 style={s.sectionTitle}>Type Performance Breakdown</h3>
               {typeBreakdown.map((t) => {
-                const pct = stats.totalInvested > 0 ? (t.total / stats.totalInvested) * 100 : 0;
+                const pct = stats.totalCurrentValue > 0 ? (t.currentValue / stats.totalCurrentValue) * 100 : 0;
+                const typeProfit = t.currentValue - t.invested;
+                const typeReturnPct = t.invested > 0 ? ((typeProfit / t.invested) * 100) : 0;
                 const color = TYPE_COLORS[t.type] || '#6B7280';
                 return (
-                  <div key={t.type} style={s.analyticsRow}>
-                    <span style={s.analyticsLabel}>{t.type}</span>
-                    <div style={s.analyticsTrack}>
-                      <div style={{ ...s.analyticsFill, width: `${pct}%`, background: color }} />
+                  <div key={t.type} style={{ marginBottom: '16px' }}>
+                    <div style={s.analyticsRow}>
+                      <span style={s.analyticsLabel}>{t.type}</span>
+                      <div style={s.analyticsTrack}>
+                        <div style={{ ...s.analyticsFill, width: `${pct}%`, background: color }} />
+                      </div>
+                      <span style={s.analyticsPct}>{Math.round(pct)}%</span>
                     </div>
-                    <span style={s.analyticsPct}>{Math.round(pct)}%</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '134px', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>{t.count} investment{t.count !== 1 ? 's' : ''} &bull; {fmt(t.currentValue)}</span>
+                      <span style={{ color: typeProfit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                        {typeProfit >= 0 ? '+' : ''}{typeReturnPct.toFixed(1)}%
+                      </span>
+                    </div>
                   </div>
                 );
               })}
               <div style={{ marginTop: '20px', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Investment Summary</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Portfolio Summary</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Types</div>
@@ -558,9 +844,88 @@ export default function Investments() {
                   </div>
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Avg per Type</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(stats.totalInvested / (typeBreakdown.length || 1))}</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(stats.totalCurrentValue / (typeBreakdown.length || 1))}</div>
                   </div>
                 </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Category Breakdown + Performance Table */}
+          <div style={s.twoCol}>
+            {/* Category Breakdown */}
+            <Card>
+              <h3 style={s.sectionTitle}>Category Breakdown</h3>
+              {categoryBreakdown.map((c) => {
+                const pct = stats.totalCurrentValue > 0 ? (c.currentValue / stats.totalCurrentValue) * 100 : 0;
+                const catProfit = c.currentValue - c.invested;
+                const catReturnPct = c.invested > 0 ? ((catProfit / c.invested) * 100) : 0;
+                const color = CATEGORY_COLORS[c.category] || '#6B7280';
+                return (
+                  <div key={c.category} style={{ marginBottom: '16px' }}>
+                    <div style={s.analyticsRow}>
+                      <span style={s.analyticsLabel}>{c.category}</span>
+                      <div style={s.analyticsTrack}>
+                        <div style={{ ...s.analyticsFill, width: `${pct}%`, background: color }} />
+                      </div>
+                      <span style={s.analyticsPct}>{Math.round(pct)}%</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: '134px', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>{c.count} investment{c.count !== 1 ? 's' : ''} &bull; {fmt(c.currentValue)}</span>
+                      <span style={{ color: catProfit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                        {catProfit >= 0 ? '+' : ''}{catReturnPct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: '20px', padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Category Summary</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Categories</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{categoryBreakdown.length}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Avg per Category</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(stats.totalCurrentValue / (categoryBreakdown.length || 1))}</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Investment Performance Ranking */}
+            <Card>
+              <h3 style={s.sectionTitle}>Investment Performance</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.perfTable}>
+                  <thead>
+                    <tr>
+                      <th style={s.perfTh}>#</th>
+                      <th style={s.perfTh}>Name</th>
+                      <th style={s.perfTh}>Invested</th>
+                      <th style={s.perfTh}>Current</th>
+                      <th style={s.perfTh}>Profit/Loss</th>
+                      <th style={s.perfTh}>ROI %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performance.slice(0, 10).map((p, i) => (
+                      <tr key={p._id} style={s.perfRow} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                        <td style={s.perfTd}>{i + 1}</td>
+                        <td style={{ ...s.perfTd, fontWeight: 600 }}>{p.name}</td>
+                        <td style={s.perfTd}>{fmt(p.amount)}</td>
+                        <td style={s.perfTd}>{fmt(p.currentValue)}</td>
+                        <td style={{ ...s.perfTd, color: p.profit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                          {p.profit >= 0 ? '+' : ''}{fmt(p.profit)}
+                        </td>
+                        <td style={{ ...s.perfTd, color: p.profit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                          {p.profit >= 0 ? '+' : ''}{p.returnPct}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </Card>
           </div>

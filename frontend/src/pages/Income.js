@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { incomeAPI } from '../services/api';
+import { useFinancialHealth } from '../context/FinancialHealthContext';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -17,6 +18,7 @@ const sources = ['Salary', 'Freelancing', 'Business', 'Gift', 'Interest', 'Renta
 
 export default function Income() {
   const navigate = useNavigate();
+  const { refreshHealth } = useFinancialHealth();
   const [form, setForm] = useState(INITIAL);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -58,6 +60,7 @@ export default function Income() {
       }
       setForm(INITIAL);
       fetch();
+      refreshHealth();
     } catch (err) { setError(err.response?.data?.error || 'Something went wrong'); }
   };
 
@@ -68,7 +71,7 @@ export default function Income() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this record?')) return;
-    try { await incomeAPI.delete(id); fetch(); }
+    try { await incomeAPI.delete(id); fetch(); refreshHealth(); }
     catch { setError('Failed to delete'); }
   };
 

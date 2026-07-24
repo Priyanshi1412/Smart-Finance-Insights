@@ -9,8 +9,10 @@ import Income from './pages/Income';
 import Expenses from './pages/Expenses';
 import Budget from './pages/Budget';
 import Reports from './pages/Reports';
-import SavingsGoals from './pages/SavingsGoals';
 import Investments from './pages/Investments';
+import PortfolioAnalytics from './pages/PortfolioAnalytics';
+import AssetAllocation from './pages/AssetAllocation';
+import FinancialGoalPlanning from './pages/FinancialGoalPlanning';
 import AIInsights from './pages/AIInsights';
 import Settings from './pages/Settings';
 import LoadingSpinner from './components/ui/LoadingSpinner';
@@ -39,8 +41,10 @@ function App() {
       <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
       <Route path="/budget" element={<ProtectedRoute><Budget /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-      <Route path="/savings-goals" element={<ProtectedRoute><SavingsGoals /></ProtectedRoute>} />
       <Route path="/investments" element={<ProtectedRoute><Investments /></ProtectedRoute>} />
+      <Route path="/portfolio-analytics" element={<ProtectedRoute><PortfolioAnalytics /></ProtectedRoute>} />
+      <Route path="/asset-allocation" element={<ProtectedRoute><AssetAllocation /></ProtectedRoute>} />
+      <Route path="/financial-goal-planning" element={<ProtectedRoute><FinancialGoalPlanning /></ProtectedRoute>} />
       <Route path="/ai-insights" element={<ProtectedRoute><AIInsights /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

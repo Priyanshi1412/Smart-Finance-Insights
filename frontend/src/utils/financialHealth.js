@@ -2,15 +2,15 @@ export function calculateFinancialHealth(totalIncome, totalExpenses) {
   const income = Number(totalIncome) || 0;
   const expenses = Number(totalExpenses) || 0;
   const savings = income - expenses;
-  const savingsRate = income > 0 ? (savings / income) * 100 : 0;
 
   let score;
-  if (savingsRate >= 50) score = 100;
-  else if (savingsRate >= 40) score = 90;
-  else if (savingsRate >= 30) score = 80;
-  else if (savingsRate >= 20) score = 70;
-  else if (savingsRate >= 10) score = 60;
-  else score = 40;
+  if (income === 0) {
+    score = 0;
+  } else {
+    score = Math.max(0, Math.min(100, Math.round((savings / income) * 100)));
+  }
+
+  const savingsRate = income > 0 ? Math.round((savings / income) * 100 * 10) / 10 : 0;
 
   let status;
   if (score >= 90) status = 'Excellent';
@@ -21,7 +21,7 @@ export function calculateFinancialHealth(totalIncome, totalExpenses) {
   return {
     score,
     status,
-    savingsRate: Math.round(savingsRate * 10) / 10,
+    savingsRate,
     totalIncome: income,
     totalExpenses: expenses,
     totalSavings: savings,

@@ -13,7 +13,7 @@ model = LinearRegression().fit(X, y)
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json or {}
-    amount = data.get('amount')
+    amount = data.get('amount')     
     if amount is None:
         return jsonify({'error': 'Missing amount'}), 400
     prediction = model.predict(np.array([[amount]]))

@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardAPI, incomeAPI, expenseAPI } from '../services/api';
+import { dashboardAPI, incomeAPI, expenseAPI, investmentAPI, portfolioAPI, goalAPI } from '../services/api';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -53,6 +53,9 @@ export default function Dashboard() {
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [invAnalytics, setInvAnalytics] = useState(null);
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [goals, setGoals] = useState([]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -80,6 +83,19 @@ export default function Dashboard() {
       } finally {
         if (mounted) setLoading(false);
       }
+
+      try {
+        const [invRes, portRes, goalRes] = await Promise.allSettled([
+          investmentAPI.getAnalytics(),
+          portfolioAPI.getAnalytics(),
+          goalAPI.getAll(),
+        ]);
+        if (mounted) {
+          if (invRes.status === 'fulfilled') setInvAnalytics(invRes.value.data);
+          if (portRes.status === 'fulfilled') setPortfolioData(portRes.value.data);
+          if (goalRes.status === 'fulfilled') setGoals(goalRes.value.data || []);
+        }
+      } catch {}
     };
 
     load();
@@ -358,6 +374,260 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      {/* ===== Investment Summary Cards ===== */}
+      {invAnalytics && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '18px', marginBottom: '28px' }}>
+            {[
+              { label: 'Total Investment', value: fmt(invAnalytics.summary.totalInvested), icon: icons.investments, color: 'var(--purple)' },
+              { label: 'Portfolio Value', value: fmt(invAnalytics.summary.totalCurrentValue), icon: icons.trendingUp, color: 'var(--success)' },
+              { label: 'Profit / Loss', value: `${invAnalytics.summary.totalReturns >= 0 ? '+' : ''}${fmt(invAnalytics.summary.totalReturns)}`, icon: icons.activity, color: invAnalytics.summary.totalReturns >= 0 ? 'var(--success)' : 'var(--danger)' },
+              { label: 'Overall ROI', value: `${invAnalytics.summary.returnPct >= 0 ? '+' : ''}${invAnalytics.summary.returnPct}%`, icon: icons.target, color: invAnalytics.summary.returnPct >= 0 ? 'var(--success)' : 'var(--danger)' },
+            ].map((card, i) => (
+              <Card key={i} hoverable style={{ position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: -8, right: -8, opacity: 0.08 }}>
+                  <Icon path={card.icon} size={80} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{card.label}</span>
+                  <Badge color="info">{card.value}</Badge>
+                </div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: card.color }}>{card.value}</div>
+              </Card>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+            {/* Portfolio Growth */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.trendingUp} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Portfolio Growth</h2>
+              </div>
+              {portfolioData?.monthlyGrowth?.length > 0 ? (
+                <div style={{ height: 260 }}>
+                  <Line data={{
+                    labels: portfolioData.monthlyGrowth.map(d => d.month),
+                    datasets: [
+                      { label: 'Invested', data: portfolioData.monthlyGrowth.map(d => d.invested), borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#8B5CF6', pointBorderColor: '#111827', pointBorderWidth: 2 },
+                      { label: 'Current Value', data: portfolioData.monthlyGrowth.map(d => d.value), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#10B981', pointBorderColor: '#111827', pointBorderWidth: 2 },
+                    ],
+                  }} options={lineChartOptions} />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No portfolio data yet</div>
+              )}
+            </Card>
+
+            {/* Asset Allocation */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.pieChart} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Asset Allocation</h2>
+              </div>
+              {invAnalytics.typeBreakdown.length > 0 ? (
+                <div style={{ height: 260 }}>
+                  <Doughnut data={{
+                    labels: invAnalytics.typeBreakdown.map(t => t.type),
+                    datasets: [{ data: invAnalytics.typeBreakdown.map(t => t.currentValue), backgroundColor: invAnalytics.typeBreakdown.map((t, i) => [chartColors.blue, chartColors.green, chartColors.amber, chartColors.purple, chartColors.teal, chartColors.pink, chartColors.red, chartColors.indigo][i % 8] + 'CC'), borderColor: '#111827', borderWidth: 3, hoverOffset: 6 }],
+                  }} options={doughnutOptions} />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No investments yet</div>
+              )}
+            </Card>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+            {/* Top Performing Assets */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.trendingUp} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Top Performing Assets</h2>
+              </div>
+              {(!portfolioData?.topPerformers || portfolioData.topPerformers.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No profitable investments yet</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {['#', 'Name', 'Type', 'Invested', 'Current', 'ROI'].map(h => (
+                          <th key={h} style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '10px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(portfolioData?.topPerformers || []).map((p, i) => (
+                        <tr key={i} style={{ transition: 'background var(--transition-fast)' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{i + 1}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{p.name}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{p.type}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{fmt(p.amount)}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{fmt(p.currentValue)}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--success)', fontWeight: 600, padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>+{p.returnPct}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
+            {/* Worst Performing Assets */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--danger-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.trendingDown} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Worst Performing Assets</h2>
+              </div>
+              {(!portfolioData?.lowestPerformers || portfolioData.lowestPerformers.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No loss-making investments</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {['#', 'Name', 'Type', 'Invested', 'Current', 'ROI'].map(h => (
+                          <th key={h} style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '10px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(portfolioData?.lowestPerformers || []).map((p, i) => (
+                        <tr key={i} style={{ transition: 'background var(--transition-fast)' }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass)'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{i + 1}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{p.name}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{p.type}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{fmt(p.amount)}</td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-primary)', padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{fmt(p.currentValue)}</td>
+                          <td style={{ fontSize: '0.85rem', color: p.returnPct >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600, padding: '10px 12px', borderBottom: '1px solid var(--border-light)' }}>{p.returnPct >= 0 ? '+' : ''}{p.returnPct}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Financial Goal Planning Summary + Risk Analysis */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+            {/* Financial Goal Planning Summary Widget */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon path={icons.target} size={18} />
+                  </div>
+                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Goal Planning Summary</h2>
+                </div>
+                <button
+                  onClick={() => navigate('/financial-goal-planning')}
+                  style={{
+                    padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', fontWeight: 600,
+                    background: 'var(--accent-glow)', border: '1px solid rgba(59,130,246,0.2)',
+                    color: 'var(--accent-light)', cursor: 'pointer', transition: 'all var(--transition-fast)',
+                  }}
+                >
+                  View All
+                </button>
+              </div>
+              {goals.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No goals created yet</div>
+              ) : (
+                (() => {
+                  const totalTarget = goals.reduce((s, g) => s + (g.targetAmount || 0), 0);
+                  const totalSaved = goals.reduce((s, g) => s + (g.savedAmount || 0), 0);
+                  const overallPct = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
+                  const isCompleted = (g) => g.status === 'achieved';
+                  const isActive = (g) => g.status === 'active';
+                  const isOverdue = (g) => g.status === 'overdue';
+                  const active = goals.filter(g => isActive(g)).length;
+                  const completed = goals.filter(g => isCompleted(g)).length;
+                  const overdue = goals.filter(g => isOverdue(g)).length;
+                  const upcoming = goals.filter(g => {
+                    if (!isActive(g)) return false;
+                    const d = g.targetDate ? Math.ceil((new Date(g.targetDate) - new Date()) / (1000 * 60 * 60 * 24)) : Infinity;
+                    return d > 0 && d <= 30;
+                  }).length;
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                        {[
+                          { label: 'Overall', value: `${overallPct}%`, color: 'var(--accent)' },
+                          { label: 'Active', value: active, color: 'var(--success)' },
+                          { label: 'Completed', value: completed, color: 'var(--purple)' },
+                          { label: 'Overdue', value: overdue, color: overdue > 0 ? 'var(--danger)' : 'var(--text-muted)' },
+                        ].map((item, i) => (
+                          <div key={i} style={{ padding: '10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: item.color }}>{item.value}</div>
+                            <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{item.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ height: 7, borderRadius: 999, background: 'var(--border)', overflow: 'hidden', marginBottom: '10px' }}>
+                        <div style={{ height: '100%', borderRadius: 999, width: `${overallPct}%`, background: 'var(--accent)', transition: 'width 0.8s ease' }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span>{fmt(totalSaved)} saved of {fmt(totalTarget)}</span>
+                        <span>{goals.length} total goals</span>
+                      </div>
+                    </>
+                  );
+                })()
+              )}
+            </Card>
+
+            {/* Risk Analysis */}
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--warning-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.shield} size={18} />
+                </div>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Risk Analysis</h2>
+              </div>
+              {portfolioData?.risk ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
+                    <div style={{ position: 'relative', width: 90, height: 90 }}>
+                      <svg width={90} height={90} style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx={45} cy={45} r={38} fill="none" stroke="var(--border)" strokeWidth={8} />
+                        <circle cx={45} cy={45} r={38} fill="none" stroke={portfolioData.risk.score >= 70 ? 'var(--success)' : portfolioData.risk.score >= 40 ? 'var(--warning)' : 'var(--danger)'} strokeWidth={8} strokeDasharray={2 * Math.PI * 38} strokeDashoffset={2 * Math.PI * 38 * (1 - Math.min(portfolioData.risk.score, 100) / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
+                      </svg>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>{portfolioData.risk.score}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Risk Score</div>
+                      <Badge color={portfolioData.risk.score >= 70 ? 'success' : portfolioData.risk.score >= 40 ? 'warning' : 'danger'}>{portfolioData.risk.label}</Badge>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ padding: '12px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Asset Classes</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>{portfolioData.risk.numTypes}</div>
+                    </div>
+                    <div style={{ padding: '12px', borderRadius: 'var(--radius-lg)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Max Allocation</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: portfolioData.risk.maxAllocation > 60 ? 'var(--danger)' : 'var(--text-primary)' }}>{portfolioData.risk.maxAllocation}%</div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>No investment data for risk analysis</div>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
     </Layout>
   );
 }
