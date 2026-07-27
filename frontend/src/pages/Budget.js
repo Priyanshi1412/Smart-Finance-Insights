@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { budgetAPI, expenseAPI } from '../services/api';
+import { useFinancialHealth } from '../context/FinancialHealthContext';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -21,6 +22,7 @@ const categories = ['Food', 'Transport', 'Shopping', 'Bills & Utilities', 'Enter
 
 export default function Budget() {
   const navigate = useNavigate();
+  const { refreshHealth } = useFinancialHealth();
   const [budgets, setBudgets] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [form, setForm] = useState({ category: 'Food', limit: '', month: new Date().toISOString().slice(0, 7) });
@@ -52,6 +54,7 @@ export default function Budget() {
       setSuccess('Budget set');
       setForm({ ...form, limit: '' });
       load();
+      refreshHealth();
     } catch (err) { setError(err.response?.data?.error || 'Failed'); }
   };
 

@@ -84,4 +84,18 @@ export const settingsAPI = {
   clearAllData: () => api.delete('/api/clear-data'),
 };
 
+export const analyticsAPI = {
+  getSpendingPatterns: () => api.get('/api/analytics/spending-patterns'),
+  getBudgetRecommendations: () => api.get('/api/analytics/budget-recommendations'),
+  getFinancialHealth: () => api.get('/api/analytics/financial-health'),
+};
+
+export const notificationAPI = {
+  getAll: () => api.get('/api/notifications'),
+  markAsRead: (id) => api.put(`/api/notifications/${id}/read`),
+  markAllRead: () => api.put('/api/notifications/read-all'),
+  delete: (id) => api.delete(`/api/notifications/${id}`),
+  generate: () => api.post('/api/notifications/generate'),
+};
+
 export default api;

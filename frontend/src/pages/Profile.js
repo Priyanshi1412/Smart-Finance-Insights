@@ -194,12 +194,12 @@ export default function Profile() {
                   <ProgressRing
                     percent={healthScore}
                     size={110} strokeWidth={10}
-                    color={healthScore >= 90 ? 'var(--success)' : healthScore >= 75 ? 'var(--accent)' : healthScore >= 60 ? 'var(--warning)' : 'var(--danger)'}
+                    color={healthScore >= 80 ? 'var(--success)' : healthScore >= 60 ? 'var(--accent)' : healthScore >= 40 ? 'var(--warning)' : 'var(--danger)'}
                   />
                   {health && (
                     <div style={{
                       fontSize: '0.82rem', fontWeight: 700, marginTop: '8px',
-                      color: healthScore >= 90 ? 'var(--success)' : healthScore >= 75 ? 'var(--accent)' : healthScore >= 60 ? 'var(--warning)' : 'var(--danger)',
+                      color: healthScore >= 80 ? 'var(--success)' : healthScore >= 60 ? 'var(--accent)' : healthScore >= 40 ? 'var(--warning)' : 'var(--danger)',
                     }}>
                       {health.status}
                     </div>

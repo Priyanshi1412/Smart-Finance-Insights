@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFinancialHealth } from '../context/FinancialHealthContext';
 import Icon, { icons } from './Icon';
 import ProgressRing from './ui/ProgressRing';
+import { notificationAPI } from '../services/api';
 
 const menu = [
   { label: 'Dashboard', path: '/dashboard', icon: icons.dashboard },
@@ -12,6 +13,7 @@ const menu = [
   { label: 'Expenses', path: '/expenses', icon: icons.expenses },
   { label: 'Budget', path: '/budget', icon: icons.budget },
   { label: 'Reports', path: '/reports', icon: icons.reports },
+  { label: 'Spending Analysis', path: '/spending-pattern-analysis', icon: icons.activity },
   { label: 'Goal Planning', path: '/financial-goal-planning', icon: icons.target },
   { label: 'Investments', path: '/investments', icon: icons.investments },
   { label: 'Portfolio Analytics', path: '/portfolio-analytics', icon: icons.barChart },
@@ -20,6 +22,7 @@ const menu = [
 ];
 
 const bottomMenu = [
+  { label: 'Notifications', path: '/notifications', icon: icons.bell },
   { label: 'Profile', path: '/profile', icon: icons.profile },
   { label: 'Settings', path: '/settings', icon: icons.settings },
 ];
@@ -32,6 +35,20 @@ export default function Layout({ children, title, centerContent = false }) {
   const { health } = useFinancialHealth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [layoutNotifCount, setLayoutNotifCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchNotifCount = async () => {
+      try {
+        const res = await notificationAPI.getAll();
+        setLayoutNotifCount(res.data.unreadCount || 0);
+      } catch {}
+    };
+    fetchNotifCount();
+    const interval = setInterval(fetchNotifCount, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', {
@@ -265,6 +282,31 @@ export default function Layout({ children, title, centerContent = false }) {
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
               <Icon path={theme === 'dark' ? icons.sun : icons.moon} size={18} />
+            </button>
+            <button
+              onClick={() => navigate('/notifications')}
+              style={{
+                width: 40, height: 40, borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all var(--transition-fast)',
+                position: 'relative',
+              }}
+              title="Notifications"
+            >
+              <Icon path={icons.bell} size={18} />
+              {layoutNotifCount > 0 && (
+                <div style={{
+                  position: 'absolute', top: -4, right: -4,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.6rem', fontWeight: 700, color: '#fff',
+                  border: '2px solid var(--bg-secondary)',
+                }}>
+                  {layoutNotifCount > 9 ? '9+' : layoutNotifCount}
+                </div>
+              )}
             </button>
             <button
               onClick={() => navigate(user ? '/profile' : '/login')}

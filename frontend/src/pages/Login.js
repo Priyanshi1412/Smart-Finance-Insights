@@ -138,7 +138,7 @@ export default function Login() {
 
         <p style={s.footer}>
           Don't have an account?{' '}
-          <Link to="/" style={s.link}>Create one</Link>
+          <Link to="/register" style={s.link}>Create one</Link>
         </p>
       </div>
     </div>

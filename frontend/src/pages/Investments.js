@@ -11,6 +11,7 @@ import ProgressRing from '../components/ui/ProgressRing';
 import EmptyState from '../components/ui/EmptyState';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { investmentAPI } from '../services/api';
+import { useFinancialHealth } from '../context/FinancialHealthContext';
 import {
   Chart as ChartJS,
   ArcElement, Tooltip as ChartTooltip, Legend as ChartLegend,
@@ -395,6 +396,7 @@ function InvestmentModal({ show, onClose, onSave, editInvestment }) {
 }
 
 export default function Investments() {
+  const { refreshHealth } = useFinancialHealth();
   const [investments, setInvestments] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -430,6 +432,7 @@ export default function Investments() {
     }
     setShowModal(false);
     setEditInvestment(null);
+    refreshHealth();
     try {
       const analyticsRes = await investmentAPI.getAnalytics();
       setAnalytics(analyticsRes.data);
@@ -446,6 +449,7 @@ export default function Investments() {
     try {
       await investmentAPI.delete(id);
       setInvestments((prev) => prev.filter((inv) => inv._id !== id));
+      refreshHealth();
       try {
         const analyticsRes = await investmentAPI.getAnalytics();
         setAnalytics(analyticsRes.data);

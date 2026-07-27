@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { dashboardAPI } from '../services/api';
+import { dashboardAPI, analyticsAPI } from '../services/api';
 import { calculateFinancialHealth } from '../utils/financialHealth';
 
 const FinancialHealthContext = createContext(null);
@@ -17,11 +17,23 @@ export function FinancialHealthProvider({ children }) {
       return;
     }
     try {
-      const res = await dashboardAPI.getSummary();
-      const { totalIncome, totalExpenses } = res.data;
-      setHealth(calculateFinancialHealth(totalIncome, totalExpenses));
+      const fhRes = await analyticsAPI.getFinancialHealth();
+      const fhData = fhRes.data;
+      setHealth({
+        score: fhData.score,
+        status: fhData.status,
+        savingsRate: fhData.indicators.savingsRate,
+        totalIncome: fhData.summary.totalIncome,
+        totalExpenses: fhData.summary.totalExpenses,
+        totalSavings: fhData.summary.savings,
+        lastUpdated: fhData.lastUpdated,
+      });
     } catch {
-      // keep previous health value on error
+      try {
+        const res = await dashboardAPI.getSummary();
+        const { totalIncome, totalExpenses } = res.data;
+        setHealth(calculateFinancialHealth(totalIncome, totalExpenses));
+      } catch {}
     } finally {
       setLoading(false);
     }

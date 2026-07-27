@@ -10,6 +10,7 @@ import ProgressRing from '../components/ui/ProgressRing';
 import EmptyState from '../components/ui/EmptyState';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { goalAPI } from '../services/api';
+import { useFinancialHealth } from '../context/FinancialHealthContext';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, Title, Tooltip as ChartTooltip, Legend as ChartLegend,
@@ -526,6 +527,7 @@ function GoalDetailModal({ show, onClose, goal, onAddContribution }) {
 }
 
 export default function FinancialGoalPlanning() {
+  const { refreshHealth } = useFinancialHealth();
   const [goals, setGoals] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -604,6 +606,7 @@ export default function FinancialGoalPlanning() {
       setShowForm(false);
       setEditGoal(null);
       await fetchGoals();
+      refreshHealth();
       console.log('[FRONTEND] Data refreshed after save');
     } catch (err) {
       console.error('[FRONTEND] Save failed:', err);
@@ -618,6 +621,7 @@ export default function FinancialGoalPlanning() {
       await goalAPI.delete(id);
       console.log('[FRONTEND] Goal deleted, refreshing data...');
       await fetchGoals();
+      refreshHealth();
       console.log('[FRONTEND] Data refreshed after delete');
     } catch (err) {
       console.error('[FRONTEND] Delete failed:', err);
@@ -630,6 +634,7 @@ export default function FinancialGoalPlanning() {
       const res = await goalAPI.addContribution(goalId, data);
       console.log('[FRONTEND] Contribution added, goal saved:', res.data?.savedAmount, 'status:', res.data?.status);
       await fetchGoals();
+      refreshHealth();
       console.log('[FRONTEND] Data refreshed after contribution');
     } catch (err) {
       console.error('[FRONTEND] Contribution failed:', err.response?.status, err.response?.data || err.message);

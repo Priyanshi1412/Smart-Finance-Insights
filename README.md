@@ -11,7 +11,7 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 ![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/Version-2.0.0-3B82F6?style=flat-square)
+![Version](https://img.shields.io/badge/Version-1.0.0-3B82F6?style=flat-square)
 ![License](https://img.shields.io/badge/License-Private-FF6B6B?style=flat-square)
 
 </div>
@@ -21,16 +21,17 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 ## What Makes It Special
 
 ### Core Features
-- **Dashboard** — Real-time financial overview with summary cards, investment summary, portfolio growth, asset allocation, top/worst performers, goals progress, and risk analysis
+- **Dashboard** — Real-time financial overview with summary cards, investment summary, portfolio growth, asset allocation, top/worst performers, goals progress, risk analysis, spending analysis, budget recommendations, and financial health score
 - **Income Tracking** — Add, edit, delete with source categorization
 - **Expense Management** — Category-wise tracking with monthly filters
-- **Budget Planning** — Set limits per category, visual progress bars
+- **Budget Planning** — Set limits per category, visual progress bars, auto-recommendations
 - **Financial Goal Planning** — Create goals with priority/status, track contributions, analytics, achievements, and AI recommendations
 - **Investment Portfolio** — Full CRUD, profit/loss tracking, type/category breakdown, diversification score
 - **Asset Allocation** — Interactive doughnut charts by type and category, allocation percentages, diversification analysis, filters
 - **Portfolio Analytics** — Comprehensive analytics combining investments and goals, risk scoring, performance tables
 - **AI Insights** — Rule-based recommendations from your spending data
 - **Reports** — Financial metrics and savings rate analysis
+- **Notifications** — Bell icon drawer in top nav with auto-generated alerts for budget warnings, goal deadlines (with urgent 7-day tier), unusual spending patterns, investment reviews, and low savings
 
 ### Design Features
 - **Glassmorphism UI** — Modern frosted glass aesthetic
@@ -39,7 +40,18 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Charts** — Chart.js (Bar, Doughnut, Line) + Recharts for data visualization
 - **Animations** — fadeIn, slideUp, scaleIn, pulse effects
 - **Progress Rings** — SVG circular progress indicators
-- **Protected Routes** — JWT-based auth guards
+- **Protected Routes** — JWT-based auth guards with auto-logout on 401
+- **Code Splitting** — React.lazy + Suspense for all 15 pages
+- **Error Boundary** — Graceful error handling with recovery UI
+- **Accessibility** — Reduced motion, focus-visible outlines, skip-to-content link
+
+### Security Features
+- **Helmet** — HTTP security headers
+- **Rate Limiting** — 200 req/15min general, 10 req/15min for auth
+- **Mongo Sanitize** — NoSQL injection prevention
+- **Input Validation** — Amount validation, string sanitization, field whitelisting on updates
+- **CORS** — Restricted to configured origin via `CORS_ORIGIN` env var
+- **Graceful Shutdown** — SIGTERM/SIGINT handlers with 10s timeout
 
 ---
 
@@ -48,11 +60,13 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 ```
 FRONTEND
   React 19, React Router 6, Axios, Chart.js, Recharts
-  CSS Variables, Glassmorphism, Responsive Grid
+  React.lazy (Code Splitting), Error Boundary
+  CSS Variables, Glassmorphism, Responsive Grid, Accessibility
 
 BACKEND
   Node.js, Express 4, MongoDB (Mongoose), JWT, bcrypt
   RESTful API, Auth Middleware, CRUD Operations
+  Helmet, Rate Limiting, Mongo Sanitize, CORS, Graceful Shutdown
 
 ML SERVICE
   Python 3.9+, Flask, Scikit-learn, NumPy, Pandas
@@ -76,19 +90,21 @@ Smart Finance Insights/
 │   │   └── index.html
 │   ├── src/
 │   │   ├── index.js          # Entry point (BrowserRouter + Providers)
-│   │   ├── index.css         # Global CSS variables + animations
-│   │   ├── App.js            # Route definitions + auth guards
+│   │   ├── index.css         # Global CSS variables + animations + a11y
+│   │   ├── App.js            # Lazy-loaded routes + ErrorBoundary + auth guards
 │   │   │
 │   │   ├── context/
-│   │   │   ├── AuthContext.js    # Login, register, logout state
-│   │   │   └── ThemeContext.js   # Dark/light theme toggle
+│   │   │   ├── AuthContext.js          # Login, register, logout state
+│   │   │   ├── ThemeContext.js         # Dark/light theme toggle
+│   │   │   └── FinancialHealthContext.js # Global financial health score provider
 │   │   │
 │   │   ├── services/
 │   │   │   └── api.js           # Axios interceptors + API methods
 │   │   │
 │   │   ├── components/
-│   │   │   ├── Layout.js        # Sidebar + topbar (responsive)
+│   │   │   ├── Layout.js        # Sidebar + topbar + notification bell drawer
 │   │   │   ├── Icon.js          # 57+ SVG icon paths
+│   │   │   ├── ErrorBoundary.js # React error boundary with recovery UI
 │   │   │   └── ui/
 │   │   │       ├── Button.js         # 5 variants + loading
 │   │   │       ├── Card.js           # Glassmorphism + hover glow
@@ -104,7 +120,7 @@ Smart Finance Insights/
 │   │   │   ├── Register.js          # / — Create account
 │   │   │   ├── Login.js             # /login — Sign in
 │   │   │   ├── Confirmation.js      # /confirmation — Post-login
-│   │   │   ├── Dashboard.js         # /dashboard — Overview + investment widgets
+│   │   │   ├── Dashboard.js         # /dashboard — Overview + financial health
 │   │   │   ├── Income.js            # /income — CRUD
 │   │   │   ├── Expenses.js          # /expenses — CRUD
 │   │   │   ├── Budget.js            # /budget — Limits
@@ -118,12 +134,14 @@ Smart Finance Insights/
 │   │   │   └── Settings.js          # /settings — Theme + danger zone
 │   │   │
 │   │   └── utils/
-│   │       └── financialHealth.js # Score calculator
+│   │       ├── formatters.js      # Currency/date formatting (fmt, fmtDate, etc.)
+│   │       ├── financialHealth.js # Score calculator
+│   │       └── notifications.js   # Notification type icons, colors, helpers
 │   │
 │   └── package.json
 │
 ├── ml/
-│   ├── app.py                # Flask ML service
+│   ├── app.py                # Flask ML service (demo with hardcoded data)
 │   ├── requirements.txt      # Python dependencies
 │   └── venv/                 # Virtual environment
 │
@@ -158,6 +176,7 @@ npm install
 MONGODB_URI=mongodb://localhost:27017/smart_finance
 JWT_SECRET=your_super_secret_random_key_here
 PORT=4000
+CORS_ORIGIN=http://localhost:3000
 ```
 
 ### 3. Start Development
@@ -248,6 +267,41 @@ python app.py              # Runs on port 5000
 |--------|----------|-------------|
 | `GET` | `/api/portfolio/analytics` | Combined investment + goal analytics, risk score, monthly growth, top/worst performers |
 
+### Analytics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/analytics/spending-patterns` | Category-wise spending breakdown |
+| `GET` | `/api/analytics/budget-recommendations` | Budget optimization suggestions |
+| `GET` | `/api/analytics/financial-health` | Financial health score calculation |
+
+### Notifications
+
+Notifications are accessible via the **bell icon drawer** in the top navigation bar. The bell shows a badge with unread count and auto-refreshes every 30 seconds.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/notifications` | Get all notifications + unread count |
+| `PUT` | `/api/notifications/:id/read` | Mark notification as read |
+| `PUT` | `/api/notifications/read-all` | Mark all notifications as read |
+| `DELETE` | `/api/notifications/:id` | Delete a notification |
+| `POST` | `/api/notifications/generate` | Generate notifications based on financial data |
+
+#### Notification Types
+
+| Type | Description | Trigger | Priority |
+|------|-------------|---------|----------|
+| `budget_exceeded` | Spending crossed budget limit | Category spending >= 100% of budget | critical |
+| `budget_warning` | Approaching budget limit | Category spending >= 80% of budget | medium |
+| `goal_overdue` | Goal missed its deadline | Target date passed with incomplete savings | high |
+| `goal_reminder` | Goal deadline approaching | Target date within 30 days | medium |
+| `goal_deadline_urgent` | Urgent goal deadline | Target date within 7 days | high |
+| `investment_loss` | Investment declined | Return < -10% | high |
+| `investment_gain` | Investment performing well | Return > 15% | low |
+| `investment_reminder` | Review investment | Not updated in 90+ days or underperforming | medium |
+| `unusual_spending` | Abnormal spending detected | Current month > 150% of 3-month average | high |
+| `low_savings` | Low savings rate | Savings rate < 10% | high |
+
 ### ML Service
 
 | Method | Endpoint | Body | Description |
@@ -259,7 +313,7 @@ python app.py              # Runs on port 5000
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `DELETE` | `/api/clear-data` | Clear all user data (income, expenses, budgets, goals, investments) |
+| `DELETE` | `/api/clear-data` | Clear all user data (income, expenses, budgets, goals, investments, notifications) |
 
 ---
 
@@ -270,7 +324,7 @@ python app.py              # Runs on port 5000
 | `/` | Register | Public | Create a new account |
 | `/login` | Login | Public | Sign in |
 | `/confirmation` | Confirmation | Protected | Post-login confirmation |
-| `/dashboard` | Dashboard | Protected | Financial overview + investment widgets |
+| `/dashboard` | Dashboard | Protected | Financial overview + health score |
 | `/income` | Income | Protected | Income CRUD |
 | `/expenses` | Expenses | Protected | Expense CRUD |
 | `/budget` | Budget | Protected | Budget limits |
@@ -316,6 +370,15 @@ python app.py              # Runs on port 5000
   paymentMethod: String
 }
 
+// Budget
+{
+  userId:    ObjectId (ref: User, required),
+  category:  String (required),
+  limit:     Number (required),
+  month:     String (required),
+  createdAt: Date
+}
+
 // Goal
 {
   userId:        ObjectId (ref: User, required),
@@ -347,6 +410,17 @@ python app.py              # Runs on port 5000
   createdAt:       Date,
   updatedAt:       Date
 }
+
+// Notification
+{
+  userId:   ObjectId (ref: User, required),
+  type:     String (required),  // budget_exceeded, budget_warning, goal_overdue, goal_reminder, goal_deadline_urgent, investment_loss, investment_gain, investment_reminder, unusual_spending, low_savings
+  title:    String (required),
+  message:  String (required),
+  priority: String (enum: low/medium/high, default: medium),
+  read:     Boolean (default: false),
+  createdAt: Date
+}
 ```
 
 ---
@@ -376,6 +450,7 @@ ProgressRing → SVG circular progress with customizable color/size
 EmptyState   → Icon + message + action button
 LoadingSpinner → Animated pulse spinner
 SemiCircleGauge → Gauge for health scores
+ErrorBoundary → React error boundary with fallback UI
 ```
 
 ### Animations
@@ -387,6 +462,7 @@ scaleIn     → 0.25s ease-out  /* Modal pop */
 pulse       → 2s infinite     /* Loading states */
 spin        → 1s linear       /* Spinner */
 shimmer     → 2s infinite     /* Skeleton loading */
+slideInRight→ 0.3s ease-out   /* Notification drawer */
 ```
 
 ---
