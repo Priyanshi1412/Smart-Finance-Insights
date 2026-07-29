@@ -4,14 +4,14 @@
 
 ### Your Personal Finance Command Center
 
-A full-stack MERN application with AI-powered financial recommendations, investment tracking, portfolio analytics, and beautiful glassmorphism UI — built to help you take control of your money.
+A full-stack MERN application with AI-powered financial recommendations, investment tracking, portfolio analytics, multi-currency support, and beautiful glassmorphism UI — built to help you take control of your money.
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![Node.js](https://img.shields.io/badge/Node.js-18-339933?style=flat-square&logo=node.js&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.0.0-3B82F6?style=flat-square)
+![Version](https://img.shields.io/badge/Version-1.1.0-3B82F6?style=flat-square)
 ![License](https://img.shields.io/badge/License-Private-FF6B6B?style=flat-square)
 
 </div>
@@ -22,6 +22,8 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 
 ### Core Features
 - **Dashboard** — Real-time financial overview with summary cards, investment summary, portfolio growth, asset allocation, top/worst performers, goals progress, risk analysis, spending analysis, budget recommendations, and financial health score
+- **Intelligence Dashboard** — Dedicated analytics page with 7 sections: spending insights, income vs expenses, investment performance, goal tracking, risk analysis, budget health, and financial health score breakdown
+- **AI Insights** — Hybrid intelligent system combining server-side ML predictions (Flask) with client-side rule-based analysis; displays predicted savings, expense trends, financial health forecasts, and actionable recommendations
 - **Income Tracking** — Add, edit, delete with source categorization
 - **Expense Management** — Category-wise tracking with monthly filters
 - **Budget Planning** — Set limits per category, visual progress bars, auto-recommendations
@@ -29,9 +31,18 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Investment Portfolio** — Full CRUD, profit/loss tracking, type/category breakdown, diversification score
 - **Asset Allocation** — Interactive doughnut charts by type and category, allocation percentages, diversification analysis, filters
 - **Portfolio Analytics** — Comprehensive analytics combining investments and goals, risk scoring, performance tables
+- **Spending Pattern Analysis** — Category-wise spending breakdown with trend analysis
 - **AI Insights** — Rule-based recommendations from your spending data
 - **Reports** — Financial metrics and savings rate analysis
-- **Notifications** — Bell icon drawer in top nav with auto-generated alerts for budget warnings, goal deadlines (with urgent 7-day tier), unusual spending patterns, investment reviews, and low savings
+- **Notifications** — Bell icon drawer in top nav + standalone notifications page with auto-generated alerts for budget warnings, goal deadlines (with urgent 7-day tier), unusual spending patterns, investment reviews, and low savings
+- **Landing Page** — Public marketing page for unauthenticated visitors
+
+### User Features
+- **Multi-Currency Support** — 7 currencies (INR, USD, EUR, GBP, JPY, AUD, CAD) with persistent preference per user
+- **Profile Management** — Profile picture upload (JPG/PNG/WEBP, 2MB limit), account info display
+- **Change Password** — Secure password update via modal dialog
+- **Currency Preferences** — Change display currency via modal, persisted to backend
+- **Session Management** — Graceful JWT expiry handling with modal notification, auto-detection on boot
 
 ### Design Features
 - **Glassmorphism UI** — Modern frosted glass aesthetic
@@ -40,8 +51,8 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Charts** — Chart.js (Bar, Doughnut, Line) + Recharts for data visualization
 - **Animations** — fadeIn, slideUp, scaleIn, pulse effects
 - **Progress Rings** — SVG circular progress indicators
-- **Protected Routes** — JWT-based auth guards with auto-logout on 401
-- **Code Splitting** — React.lazy + Suspense for all 15 pages
+- **Protected Routes** — JWT-based auth guards with session expiry modal
+- **Code Splitting** — React.lazy + Suspense for all 20 pages
 - **Error Boundary** — Graceful error handling with recovery UI
 - **Accessibility** — Reduced motion, focus-visible outlines, skip-to-content link
 
@@ -52,6 +63,8 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Input Validation** — Amount validation, string sanitization, field whitelisting on updates
 - **CORS** — Restricted to configured origin via `CORS_ORIGIN` env var
 - **Graceful Shutdown** — SIGTERM/SIGINT handlers with 10s timeout
+- **Persistent JWT Secret** — Secret key survives server restarts
+- **ML Service Isolation** — Flask runs on separate port, backend proxies all ML calls, no direct frontend-to-Flask communication
 
 ---
 
@@ -62,15 +75,22 @@ FRONTEND
   React 19, React Router 6, Axios, Chart.js, Recharts
   React.lazy (Code Splitting), Error Boundary
   CSS Variables, Glassmorphism, Responsive Grid, Accessibility
+  CurrencyContext (7 currencies), AuthContext (session expiry)
+  ML Predictions display with graceful fallback
 
 BACKEND
   Node.js, Express 4, MongoDB (Mongoose), JWT, bcrypt
   RESTful API, Auth Middleware, CRUD Operations
   Helmet, Rate Limiting, Mongo Sanitize, CORS, Graceful Shutdown
+  User Management (profile, password, currency preferences)
+  ML Service Layer (Axios client, timeout, retry, health checks)
 
-ML SERVICE
-  Python 3.9+, Flask, Scikit-learn, NumPy, Pandas
-  Linear Regression, Financial Predictions
+ML SERVICE (Python)
+  Flask, Flask-CORS, NumPy
+  Linear Regression (from scratch, no sklearn dependency)
+  Financial health scoring, savings/expense trend prediction
+  Recommendation engine based on real user data
+  Accepts monthly financial data from Express backend
 ```
 
 ---
@@ -81,7 +101,9 @@ ML SERVICE
 Smart Finance Insights/
 │
 ├── backend/
-│   ├── index.js              # Express server + all models/routes
+│   ├── index.js              # Express server + all models/routes (~2020 lines)
+│   ├── services/
+│   │   └── mlService.js      # ML service client (Axios, timeout, retry, health checks)
 │   ├── package.json
 │   └── .env                  # Environment variables
 │
@@ -89,21 +111,22 @@ Smart Finance Insights/
 │   ├── public/
 │   │   └── index.html
 │   ├── src/
-│   │   ├── index.js          # Entry point (BrowserRouter + Providers)
+│   │   ├── index.js          # Entry point (BrowserRouter + 4 Providers)
 │   │   ├── index.css         # Global CSS variables + animations + a11y
-│   │   ├── App.js            # Lazy-loaded routes + ErrorBoundary + auth guards
+│   │   ├── App.js            # Lazy-loaded routes + ErrorBoundary + SessionExpiredModal
 │   │   │
 │   │   ├── context/
-│   │   │   ├── AuthContext.js          # Login, register, logout state
-│   │   │   ├── ThemeContext.js         # Dark/light theme toggle
-│   │   │   └── FinancialHealthContext.js # Global financial health score provider
+│   │   │   ├── AuthContext.js              # Login, register, logout, session expiry, updateUser
+│   │   │   ├── ThemeContext.js             # Dark/light theme toggle
+│   │   │   ├── CurrencyContext.js          # Multi-currency state + formatCurrency
+│   │   │   └── FinancialHealthContext.js   # Global financial health score provider
 │   │   │
 │   │   ├── services/
-│   │   │   └── api.js           # Axios interceptors + API methods
+│   │   │   └── api.js           # Axios interceptors + API methods + userAPI + session utils
 │   │   │
 │   │   ├── components/
-│   │   │   ├── Layout.js        # Sidebar + topbar + notification bell drawer
-│   │   │   ├── Icon.js          # 57+ SVG icon paths
+│   │   │   ├── Layout.js        # Sidebar + topbar + notification bell drawer + avatar
+│   │   │   ├── Icon.js          # 60+ SVG icon paths
 │   │   │   ├── ErrorBoundary.js # React error boundary with recovery UI
 │   │   │   └── ui/
 │   │   │       ├── Button.js         # 5 variants + loading
@@ -117,21 +140,25 @@ Smart Finance Insights/
 │   │   │       └── LoadingSpinner.js # Animated loader
 │   │   │
 │   │   ├── pages/
-│   │   │   ├── Register.js          # / — Create account
-│   │   │   ├── Login.js             # /login — Sign in
-│   │   │   ├── Confirmation.js      # /confirmation — Post-login
-│   │   │   ├── Dashboard.js         # /dashboard — Overview + financial health
-│   │   │   ├── Income.js            # /income — CRUD
-│   │   │   ├── Expenses.js          # /expenses — CRUD
-│   │   │   ├── Budget.js            # /budget — Limits
-│   │   │   ├── Reports.js           # /reports — Analytics
-│   │   │   ├── FinancialGoalPlanning.js  # /financial-goal-planning — Goal CRUD + analytics + contributions
-│   │   │   ├── Investments.js       # /investments — CRUD + Portfolio
-│   │   │   ├── AssetAllocation.js   # /asset-allocation — Allocation breakdown
-│   │   │   ├── PortfolioAnalytics.js# /portfolio-analytics — Full analytics
-│   │   │   ├── AIInsights.js        # /ai-insights — Recommendations
-│   │   │   ├── Profile.js           # /profile — Account info
-│   │   │   └── Settings.js          # /settings — Theme + danger zone
+│   │   │   ├── Landing.js               # / — Public marketing page
+│   │   │   ├── Register.js              # /register — Create account
+│   │   │   ├── Login.js                 # /login — Sign in
+│   │   │   ├── Confirmation.js          # /confirmation — Post-login
+│   │   │   ├── Dashboard.js             # /dashboard — Overview + financial health
+│   │   │   ├── IntelligenceDashboard.js # /intelligence — Full analytics dashboard
+│   │   │   ├── Income.js                # /income — CRUD
+│   │   │   ├── Expenses.js              # /expenses — CRUD
+│   │   │   ├── Budget.js                # /budget — Limits
+│   │   │   ├── Reports.js               # /reports — Analytics
+│   │   │   ├── FinancialGoalPlanning.js # /financial-goal-planning — Goals + analytics
+│   │   │   ├── Investments.js           # /investments — CRUD + Portfolio
+│   │   │   ├── AssetAllocation.js       # /asset-allocation — Allocation breakdown
+│   │   │   ├── PortfolioAnalytics.js    # /portfolio-analytics — Full analytics
+│   │   │   ├── SpendingPatternAnalysis.js # /spending-pattern-analysis — Spending trends
+│   │   │   ├── AIInsights.js            # /ai-insights — Recommendations
+│   │   │   ├── Notifications.js         # /notifications — Standalone notifications page
+│   │   │   ├── Profile.js               # /profile — Account info + picture upload
+│   │   │   └── Settings.js              # /settings — Theme + password + currency + data
 │   │   │
 │   │   └── utils/
 │   │       ├── formatters.js      # Currency/date formatting (fmt, fmtDate, etc.)
@@ -141,8 +168,8 @@ Smart Finance Insights/
 │   └── package.json
 │
 ├── ml/
-│   ├── app.py                # Flask ML service (demo with hardcoded data)
-│   ├── requirements.txt      # Python dependencies
+│   ├── app.py                # Flask ML service (financial predictions + analysis)
+│   ├── requirements.txt      # Python dependencies (flask, flask-cors, numpy)
 │   └── venv/                 # Virtual environment
 │
 ├── package.json              # Root scripts (concurrently)
@@ -177,6 +204,9 @@ MONGODB_URI=mongodb://localhost:27017/smart_finance
 JWT_SECRET=your_super_secret_random_key_here
 PORT=4000
 CORS_ORIGIN=http://localhost:3000
+ML_SERVICE_URL=http://localhost:5000
+ML_TIMEOUT=10000
+ML_RETRIES=2
 ```
 
 ### 3. Start Development
@@ -187,6 +217,8 @@ npm start
 ```
 
 ### 4. (Optional) ML Service
+
+The ML service provides predictive analytics for the AI Insights page. The application works without it (rule-based fallback), but predictions require it running.
 
 ```bash
 cd ml
@@ -205,8 +237,18 @@ python app.py              # Runs on port 5000
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/register` | Create account |
-| `POST` | `/api/login` | Get JWT token |
+| `POST` | `/api/login` | Get JWT token + user profile |
 | `GET` | `/api/health` | Health check |
+
+### User Management
+
+| Method | Endpoint | Body | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/user/account-info` | — | Get user profile + stats |
+| `PUT` | `/api/user/profile` | `{ name, email }` | Update profile |
+| `DELETE` | `/api/user/profile-picture` | — | Remove profile picture |
+| `PUT` | `/api/user/password` | `{ currentPassword, newPassword }` | Change password |
+| `PUT` | `/api/user/currency` | `{ currency }` | Update currency preference |
 
 ### Dashboard
 
@@ -249,7 +291,7 @@ python app.py              # Runs on port 5000
 | `PUT` | `/api/goals/:id` | Same as above |
 | `DELETE` | `/api/goals/:id` | — |
 | `POST` | `/api/goals/:id/contributions` | `{ amount, date, note }` |
-| `GET` | `/api/goals/analytics` | Returns summary, achievements, recommendations, monthly data, category distribution |
+| `GET` | `/api/goals/analytics` | Summary, achievements, recommendations, monthly data, category distribution |
 
 ### Investments
 
@@ -259,7 +301,7 @@ python app.py              # Runs on port 5000
 | `POST` | `/api/investments` | `{ name, type, category, amount, currentValue, investedDate, expectedReturns, status, notes }` |
 | `PUT` | `/api/investments/:id` | Same as above |
 | `DELETE` | `/api/investments/:id` | — |
-| `GET` | `/api/investments/analytics` | Returns type/category breakdown, performance, diversification score |
+| `GET` | `/api/investments/analytics` | Type/category breakdown, performance, diversification score |
 
 ### Portfolio Analytics
 
@@ -277,7 +319,7 @@ python app.py              # Runs on port 5000
 
 ### Notifications
 
-Notifications are accessible via the **bell icon drawer** in the top navigation bar. The bell shows a badge with unread count and auto-refreshes every 30 seconds.
+Notifications are accessible via the **bell icon drawer** in the top navigation bar and the standalone `/notifications` page. The bell shows a badge with unread count and auto-refreshes every 30 seconds.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -302,12 +344,51 @@ Notifications are accessible via the **bell icon drawer** in the top navigation 
 | `unusual_spending` | Abnormal spending detected | Current month > 150% of 3-month average | high |
 | `low_savings` | Low savings rate | Savings rate < 10% | high |
 
-### ML Service
+### ML Service Integration
+
+The Flask ML service is integrated with the Express backend via a dedicated service layer (`backend/services/mlService.js`). The backend collects real user financial data from MongoDB, sends it to the Flask service, and returns predictions to the frontend.
+
+**Architecture:**
+```
+React Frontend → Express Backend → Flask ML Service → Response → Frontend
+```
+
+**Backend ML Endpoints:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/ml/health` | Check if ML service is available |
+| `GET` | `/api/ml/financial-insights` | Full analysis: predictions + health + recommendations |
+| `GET` | `/api/ml/predictions` | Savings and expense predictions only |
+| `POST` | `/api/ml/analyze` | Custom analysis with raw monthly data |
+
+**Flask ML Endpoints (internal, called by backend):**
 
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
-| `GET` | `/health` | — | Service health |
-| `POST` | `/predict` | `{ amount }` | Predict future value |
+| `GET` | `/health` | — | Service health check |
+| `POST` | `/predict/savings` | `{ monthly: [...] }` | Predict next month's savings |
+| `POST` | `/predict/expenses` | `{ monthly: [...] }` | Predict next month's expenses |
+| `POST` | `/predict/financial-health` | `{ monthly: [...] }` | Predict financial health score |
+| `POST` | `/analyze` | `{ monthly: [...] }` | Full analysis with predictions + recommendations |
+
+**Monthly Data Format:**
+```json
+{
+  "monthly": [
+    { "month": "2026-01", "income": 50000, "expenses": 35000, "savings": 15000 },
+    { "month": "2026-02", "income": 52000, "expenses": 33000, "savings": 19000 }
+  ]
+}
+```
+
+**Production Safeguards:**
+- `ML_SERVICE_URL` environment variable for Flask service location
+- Automatic health checks with 60-second cache
+- Retry logic (2 retries with exponential backoff)
+- 10-second timeout per request
+- Graceful fallback to rule-based logic if ML service is unavailable
+- Structured logging for ML request failures
 
 ### Data Management
 
@@ -321,10 +402,12 @@ Notifications are accessible via the **bell icon drawer** in the top navigation 
 
 | Route | Page | Access | Description |
 |-------|------|--------|-------------|
-| `/` | Register | Public | Create a new account |
+| `/` | Landing | Public | Marketing page for visitors |
+| `/register` | Register | Public | Create a new account |
 | `/login` | Login | Public | Sign in |
 | `/confirmation` | Confirmation | Protected | Post-login confirmation |
 | `/dashboard` | Dashboard | Protected | Financial overview + health score |
+| `/intelligence` | Intelligence Dashboard | Protected | Full analytics with 7 sections |
 | `/income` | Income | Protected | Income CRUD |
 | `/expenses` | Expenses | Protected | Expense CRUD |
 | `/budget` | Budget | Protected | Budget limits |
@@ -333,9 +416,11 @@ Notifications are accessible via the **bell icon drawer** in the top navigation 
 | `/investments` | Investments | Protected | Portfolio management + CRUD |
 | `/asset-allocation` | Asset Allocation | Protected | Allocation breakdown by type/category |
 | `/portfolio-analytics` | Portfolio Analytics | Protected | Comprehensive investment + goal analytics |
+| `/spending-pattern-analysis` | Spending Pattern Analysis | Protected | Category-wise spending trends |
 | `/ai-insights` | AI Insights | Protected | Recommendations |
-| `/profile` | Profile | Protected | Account details |
-| `/settings` | Settings | Protected | Theme + preferences |
+| `/notifications` | Notifications | Protected | Standalone notifications page |
+| `/profile` | Profile | Protected | Account info + profile picture |
+| `/settings` | Settings | Protected | Theme, password, currency, data management |
 
 ---
 
@@ -344,10 +429,14 @@ Notifications are accessible via the **bell icon drawer** in the top navigation 
 ```javascript
 // User
 {
-  name:        String (required),
-  email:       String (required, unique),
-  password:    String (hashed, required),
-  createdAt:   Date
+  name:              String (required),
+  email:             String (required, unique),
+  password:          String (hashed, required),
+  profilePicture:    String (base64 data URL),
+  currency:          String (default: 'INR'),
+  passwordChangedAt: Date,
+  lastLoginAt:       Date,
+  createdAt:         Date
 }
 
 // Income
@@ -414,7 +503,7 @@ Notifications are accessible via the **bell icon drawer** in the top navigation 
 // Notification
 {
   userId:   ObjectId (ref: User, required),
-  type:     String (required),  // budget_exceeded, budget_warning, goal_overdue, goal_reminder, goal_deadline_urgent, investment_loss, investment_gain, investment_reminder, unusual_spending, low_savings
+  type:     String (required),
   title:    String (required),
   message:  String (required),
   priority: String (enum: low/medium/high, default: medium),
@@ -451,6 +540,7 @@ EmptyState   → Icon + message + action button
 LoadingSpinner → Animated pulse spinner
 SemiCircleGauge → Gauge for health scores
 ErrorBoundary → React error boundary with fallback UI
+Modal        → Backdrop blur + fade/slide animation (password, currency)
 ```
 
 ### Animations
@@ -463,7 +553,21 @@ pulse       → 2s infinite     /* Loading states */
 spin        → 1s linear       /* Spinner */
 shimmer     → 2s infinite     /* Skeleton loading */
 slideInRight→ 0.3s ease-out   /* Notification drawer */
+modalFadeIn → 0.2s ease-out   /* Modal backdrop */
+modalSlideIn→ 0.25s ease-out  /* Modal content */
 ```
+
+### Supported Currencies
+
+| Code | Symbol | Name | Locale |
+|------|--------|------|--------|
+| `INR` | ₹ | Indian Rupee | en-IN |
+| `USD` | $ | US Dollar | en-US |
+| `EUR` | € | Euro | de-DE |
+| `GBP` | £ | British Pound | en-GB |
+| `JPY` | ¥ | Japanese Yen | ja-JP |
+| `AUD` | A$ | Australian Dollar | en-AU |
+| `CAD` | C$ | Canadian Dollar | en-CA |
 
 ---
 

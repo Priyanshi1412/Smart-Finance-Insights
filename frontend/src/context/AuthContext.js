@@ -1,24 +1,34 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authAPI } from '../services/api';
+import { authAPI, onSessionExpired, clearSession, isTokenExpired, getToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     const userStr = localStorage.getItem('user');
     if (token && userStr) {
-      try {
-        setUser(JSON.parse(userStr));
-      } catch {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+      if (isTokenExpired(token)) {
+        clearSession();
+      } else {
+        try {
+          setUser(JSON.parse(userStr));
+        } catch {
+          clearSession();
+        }
       }
     }
     setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    onSessionExpired(() => {
+      setSessionExpired(true);
+    });
   }, []);
 
   const login = useCallback(async (email, password) => {
@@ -26,6 +36,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', res.data.token);
     localStorage.setItem('user', JSON.stringify(res.data.user));
     setUser(res.data.user);
+    setSessionExpired(false);
     return res.data;
   }, []);
 
@@ -35,13 +46,38 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearSession();
     setUser(null);
+    setSessionExpired(false);
+  }, []);
+
+  const updateUser = useCallback((updates) => {
+    setUser(prev => {
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const dismissSessionExpired = useCallback(() => {
+    clearSession();
+    setUser(null);
+    setSessionExpired(false);
+    window.location.href = '/login';
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      register,
+      logout,
+      updateUser,
+      sessionExpired,
+      dismissSessionExpired,
+      isAuthenticated: !!user,
+    }}>
       {children}
     </AuthContext.Provider>
   );

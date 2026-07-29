@@ -24,7 +24,8 @@ export function getNotifPriorityBg(priority) {
   switch (priority) {
     case 'critical': return 'var(--danger-glow)';
     case 'high': return 'var(--warning-glow)';
-    case 'success': return 'rgba(16,185,129,0.15)';
+    case 'medium': return 'var(--info-glow)';
+    case 'low': return 'rgba(16,185,129,0.15)';
     default: return 'var(--accent-glow)';
   }
 }

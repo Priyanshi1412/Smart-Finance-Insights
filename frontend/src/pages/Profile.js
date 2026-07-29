@@ -1,26 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { useFinancialHealth } from '../context/FinancialHealthContext';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Icon, { icons } from '../components/Icon';
 import ProgressRing from '../components/ui/ProgressRing';
-import { incomeAPI, expenseAPI, investmentAPI, goalAPI } from '../services/api';
-
-const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
+import { incomeAPI, expenseAPI, investmentAPI, goalAPI, userAPI } from '../services/api';
 
 const fadeInUp = { animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 };
 const stagger = (i) => ({ animationDelay: `${i * 0.08}s` });
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
+  const { formatCurrency } = useCurrency();
   const { theme, toggleTheme } = useTheme();
   const { health } = useFinancialHealth();
   const [counts, setCounts] = useState({ income: 0, expenses: 0, investments: 0, goals: 0 });
+  const [accountInfo, setAccountInfo] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(user?.profilePicture || '');
+  const [uploadMsg, setUploadMsg] = useState({ type: '', text: '' });
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!localStorage.getItem('token')) navigate('/login');
@@ -46,6 +51,73 @@ export default function Profile() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const fetchAccountInfo = async () => {
+      try {
+        const res = await userAPI.getAccountInfo();
+        setAccountInfo(res.data);
+      } catch {}
+    };
+    fetchAccountInfo();
+  }, []);
+
+  useEffect(() => {
+    setPreviewUrl(user?.profilePicture || '');
+  }, [user?.profilePicture]);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setUploadMsg({ type: 'error', text: 'Please select a JPG, PNG, or WEBP image.' });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadMsg({ type: 'error', text: 'Image must be less than 2MB.' });
+      return;
+    }
+
+    setUploadMsg({ type: '', text: '' });
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPreviewUrl(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadSave = async () => {
+    if (!previewUrl) return;
+    setUploading(true);
+    setUploadMsg({ type: '', text: '' });
+    try {
+      const res = await userAPI.updateProfile({ profilePicture: previewUrl });
+      updateUser({ profilePicture: res.data.profilePicture });
+      setUploadMsg({ type: 'success', text: 'Profile picture updated!' });
+    } catch (err) {
+      setUploadMsg({ type: 'error', text: err.response?.data?.error || 'Failed to upload image' });
+      setPreviewUrl(user?.profilePicture || '');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setUploading(true);
+    setUploadMsg({ type: '', text: '' });
+    try {
+      await userAPI.removeProfilePicture();
+      setPreviewUrl('');
+      updateUser({ profilePicture: '' });
+      setUploadMsg({ type: 'success', text: 'Profile picture removed.' });
+    } catch (err) {
+      setUploadMsg({ type: 'error', text: 'Failed to remove picture' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
@@ -53,7 +125,11 @@ export default function Profile() {
   const savingsRate = health ? health.savingsRate : 0;
   const healthScore = health ? health.score : 0;
 
-  const memberSince = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const memberSince = accountInfo?.createdAt
+    ? new Date(accountInfo.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    : user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    : '—';
 
   return (
     <Layout title="Profile">
@@ -87,7 +163,21 @@ export default function Profile() {
         }
         .setting-row { transition: all 0.2s ease; }
         .setting-row:hover { background: var(--bg-glass); border-radius: var(--radius-md); }
+        .avatar-overlay {
+          position: absolute; inset: 0; border-radius: 50%;
+          background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+          opacity: 0; transition: opacity 0.2s; cursor: pointer;
+        }
+        .avatar-container:hover .avatar-overlay { opacity: 1; }
       `}</style>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
 
       <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
@@ -118,17 +208,98 @@ export default function Profile() {
 
             {/* Avatar + Info */}
             <div style={{ padding: '0 32px 32px', textAlign: 'center', marginTop: -50, position: 'relative' }}>
-              <div className="profile-avatar" style={{
+              <div className="avatar-container" style={{
                 width: 100, height: 100, borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--accent), var(--purple))',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '2rem', fontWeight: 800, color: '#fff',
                 margin: '0 auto 16px', border: '4px solid var(--bg-secondary)',
                 boxShadow: '0 8px 32px rgba(59,130,246,0.3)',
-                position: 'relative', zIndex: 1,
+                position: 'relative', zIndex: 1, overflow: 'hidden',
               }}>
-                {initials}
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt="Profile"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                  />
+                ) : (
+                  <div className="profile-avatar" style={{
+                    width: '100%', height: '100%', borderRadius: '50%',
+                    background: 'linear-gradient(135deg, var(--accent), var(--purple))',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '2rem', fontWeight: 800, color: '#fff',
+                  }}>
+                    {initials}
+                  </div>
+                )}
+                <div className="avatar-overlay" onClick={() => fileInputRef.current?.click()}>
+                  <Icon path={icons.camera} size={24} />
+                </div>
               </div>
+
+              {/* Photo Actions */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 600,
+                    background: 'var(--accent-glow)', border: '1px solid rgba(59,130,246,0.2)',
+                    color: 'var(--accent-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                  }}
+                >
+                  <Icon path={icons.upload} size={13} /> Upload Photo
+                </button>
+                {previewUrl && (
+                  <>
+                    <button
+                      onClick={handleUploadSave}
+                      disabled={uploading}
+                      style={{
+                        padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 600,
+                        background: 'var(--success-glow)', border: '1px solid rgba(16,185,129,0.2)',
+                        color: 'var(--success-light)', cursor: uploading ? 'not-allowed' : 'pointer',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    >
+                      {uploading ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleRemovePhoto}
+                      disabled={uploading}
+                      style={{
+                        padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 600,
+                        background: 'var(--danger-glow)', border: '1px solid rgba(239,68,68,0.2)',
+                        color: 'var(--danger-light)', cursor: uploading ? 'not-allowed' : 'pointer',
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </>
+                )}
+                {!previewUrl && user?.profilePicture && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    disabled={uploading}
+                    style={{
+                      padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 600,
+                      background: 'var(--danger-glow)', border: '1px solid rgba(239,68,68,0.2)',
+                      color: 'var(--danger-light)', cursor: uploading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Reset to Default
+                  </button>
+                )}
+              </div>
+
+              {uploadMsg.text && (
+                <div style={{
+                  padding: '8px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', fontWeight: 500, marginBottom: '12px',
+                  background: uploadMsg.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                  border: `1px solid ${uploadMsg.type === 'success' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                  color: uploadMsg.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+                }}>
+                  {uploadMsg.text}
+                </div>
+              )}
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
                 {user?.name}
@@ -209,15 +380,15 @@ export default function Profile() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                     <div>
                       <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Total Income</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--success)' }}>{fmt(health.totalIncome)}</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(health.totalIncome)}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Total Expenses</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--danger)' }}>{fmt(health.totalExpenses)}</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--danger)' }}>{formatCurrency(health.totalExpenses)}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Net Savings</div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: health.totalSavings >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt(health.totalSavings)}</div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: health.totalSavings >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(health.totalSavings)}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Savings Rate</div>
@@ -230,8 +401,40 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Settings Section */}
+        {/* Account Information */}
         <div style={{ ...fadeInUp, ...stagger(6) }}>
+          <Card style={{ padding: '24px 28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 'var(--radius-md)',
+                background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon path={icons.clock} size={18} />
+              </div>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Account Information
+              </h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {[
+                { label: 'Account Created', value: memberSince },
+                { label: 'Last Login', value: accountInfo?.lastLoginAt ? new Date(accountInfo.lastLoginAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' },
+                { label: 'Password Last Changed', value: accountInfo?.passwordChangedAt ? new Date(accountInfo.passwordChangedAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Never' },
+              ].map((item, i) => (
+                <div key={i}>
+                  <div className="setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 12px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{item.label}</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.value}</span>
+                  </div>
+                  {i < 2 && <div style={{ height: 1, background: 'var(--border-light)', margin: '2px 12px' }} />}
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Preferences */}
+        <div style={{ ...fadeInUp, ...stagger(7) }}>
           <Card style={{ padding: '24px 28px' }}>
             <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
               Preferences
@@ -310,7 +513,7 @@ export default function Profile() {
         </div>
 
         {/* Sign Out */}
-        <div style={{ ...fadeInUp, ...stagger(7) }}>
+        <div style={{ ...fadeInUp, ...stagger(8) }}>
           <Button
             fullWidth
             variant="danger"

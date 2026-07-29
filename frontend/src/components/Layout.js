@@ -19,6 +19,7 @@ const menu = [
   { label: 'Portfolio Analytics', path: '/portfolio-analytics', icon: icons.barChart },
   { label: 'Asset Allocation', path: '/asset-allocation', icon: icons.pieChart },
   { label: 'AI Insights', path: '/ai-insights', icon: icons.brain },
+  { label: 'Intelligence', path: '/intelligence', icon: icons.shield },
 ];
 
 const bottomMenu = [
@@ -26,6 +27,47 @@ const bottomMenu = [
   { label: 'Profile', path: '/profile', icon: icons.profile },
   { label: 'Settings', path: '/settings', icon: icons.settings },
 ];
+
+const NavItem = ({ item, active, collapsed, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '10px 14px',
+        borderRadius: 'var(--radius-md)',
+        background: active ? 'var(--accent-glow-strong)' : 'transparent',
+        border: active ? '1px solid rgba(59,130,246,0.2)' : '1px solid transparent',
+        color: active ? 'var(--accent-light)' : 'var(--text-secondary)',
+        cursor: 'pointer',
+        transition: 'all var(--transition-fast)',
+        fontSize: '0.9rem',
+        fontWeight: active ? 600 : 500,
+        width: '100%',
+        textAlign: 'left',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'var(--accent-glow)';
+          e.currentTarget.style.color = 'var(--text-primary)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'var(--text-secondary)';
+        }
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, width: 20, justifyContent: 'center' }}>
+        <Icon path={item.icon} size={18} />
+      </span>
+      {!collapsed && <span>{item.label}</span>}
+    </button>
+  );
+};
 
 export default function Layout({ children, title, centerContent = false }) {
   const navigate = useNavigate();
@@ -35,7 +77,19 @@ export default function Layout({ children, title, centerContent = false }) {
   const { health } = useFinancialHealth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [layoutNotifCount, setLayoutNotifCount] = useState(0);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) setCollapsed(true);
+  }, [isMobile]);
 
   useEffect(() => {
     if (!user) return;
@@ -58,62 +112,11 @@ export default function Layout({ children, title, centerContent = false }) {
     day: 'numeric',
   });
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 900) setCollapsed(true);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U';
-
-  const NavItem = ({ item }) => {
-    const active = location.pathname === item.path;
-    return (
-      <button
-        onClick={() => navigate(item.path)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          borderRadius: 'var(--radius-md)',
-          background: active ? 'var(--accent-glow-strong)' : 'transparent',
-          border: active ? '1px solid rgba(59,130,246,0.2)' : '1px solid transparent',
-          color: active ? 'var(--accent-light)' : 'var(--text-secondary)',
-          cursor: 'pointer',
-          transition: 'all var(--transition-fast)',
-          fontSize: '0.9rem',
-          fontWeight: active ? 600 : 500,
-          width: '100%',
-          textAlign: 'left',
-        }}
-        onMouseEnter={(e) => {
-          if (!active) {
-            e.currentTarget.style.background = 'var(--accent-glow)';
-            e.currentTarget.style.color = 'var(--text-primary)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!active) {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'var(--text-secondary)';
-          }
-        }}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, width: 20, justifyContent: 'center' }}>
-          <Icon path={item.icon} size={18} />
-        </span>
-        {!collapsed && <span>{item.label}</span>}
-      </button>
-    );
-  };
 
   const sidebarWidth = collapsed ? 72 : 260;
 
@@ -137,13 +140,13 @@ export default function Layout({ children, title, centerContent = false }) {
         display: 'flex',
         flexDirection: 'column',
         padding: collapsed ? '20px 12px' : '24px 16px',
-        position: window.innerWidth < 900 ? 'fixed' : 'sticky',
+        position: isMobile ? 'fixed' : 'sticky',
         top: 0,
         height: '100vh',
         zIndex: 999,
         transition: 'all var(--transition-base)',
         overflowY: 'auto',
-        ...(window.innerWidth < 900 ? {
+        ...(isMobile ? {
           transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
           left: 0,
         } : {}),
@@ -170,7 +173,9 @@ export default function Layout({ children, title, centerContent = false }) {
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-          {menu.map((item) => <NavItem key={item.path} item={item} />)}
+          {menu.map((item) => (
+            <NavItem key={item.path} item={item} active={location.pathname === item.path} collapsed={collapsed} onClick={() => navigate(item.path)} />
+          ))}
         </nav>
 
         <div style={{
@@ -181,7 +186,9 @@ export default function Layout({ children, title, centerContent = false }) {
           flexDirection: 'column',
           gap: '4px',
         }}>
-          {bottomMenu.map((item) => <NavItem key={item.path} item={item} />)}
+          {bottomMenu.map((item) => (
+            <NavItem key={item.path} item={item} active={location.pathname === item.path} collapsed={collapsed} onClick={() => navigate(item.path)} />
+          ))}
         </div>
 
         <div style={{
@@ -238,7 +245,7 @@ export default function Layout({ children, title, centerContent = false }) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
-              onClick={() => window.innerWidth < 900 ? setMobileOpen(true) : setCollapsed(!collapsed)}
+              onClick={() => isMobile ? setMobileOpen(true) : setCollapsed(!collapsed)}
               style={{
                 width: 40, height: 40, borderRadius: 'var(--radius-md)',
                 background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -312,14 +319,18 @@ export default function Layout({ children, title, centerContent = false }) {
               onClick={() => navigate(user ? '/profile' : '/login')}
               style={{
                 width: 40, height: 40, borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--accent), var(--purple))',
+                background: user?.profilePicture ? 'none' : 'linear-gradient(135deg, var(--accent), var(--purple))',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '0.8rem', fontWeight: 700, color: '#fff',
                 border: '2px solid var(--accent-glow-strong)',
-                cursor: 'pointer',
+                cursor: 'pointer', overflow: 'hidden', padding: 0,
               }}
             >
-              {initials}
+              {user?.profilePicture ? (
+                <img src={user.profilePicture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                initials
+              )}
             </button>
           </div>
         </div>

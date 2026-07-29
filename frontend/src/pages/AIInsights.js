@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardAPI, incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, analyticsAPI } from '../services/api';
+import { dashboardAPI, incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, analyticsAPI, mlAPI } from '../services/api';
 import { useFinancialHealth } from '../context/FinancialHealthContext';
 import { fmt, getMonthKey, getCurrentMonthKey, getPreviousMonthKey } from '../utils/formatters';
 import Layout from '../components/Layout';
@@ -10,6 +10,44 @@ import Icon, { icons } from '../components/Icon';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import SemiCircleGauge from '../components/ui/SemiCircleGauge';
 
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
+  ArcElement, PointElement, LineElement, Filler,
+} from 'chart.js';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
+
+import {
+  FiTrendingDown, FiTrendingUp, FiDollarSign, FiEye, FiAlertTriangle,
+  FiShield, FiSettings, FiPlusCircle, FiCheckCircle, FiZap,
+  FiAlertOctagon, FiTarget, FiClock, FiPieChart, FiBarChart2,
+  FiActivity, FiArrowUp, FiArrowDown, FiMinus, FiBrain,
+  FiSmartphone, FiCreditCard, FiBriefcase, FiHome, FiBookOpen, FiCpu,
+} from 'react-icons/fi';
+
+ChartJS.register(
+  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
+  ArcElement, PointElement, LineElement, Filler,
+);
+
+const CATEGORY_COLORS = {
+  Food: '#EF4444', Transport: '#3B82F6', Shopping: '#8B5CF6',
+  'Bills & Utilities': '#F59E0B', Entertainment: '#EC4899',
+  Healthcare: '#10B981', Education: '#6366F1', Travel: '#14B8A6',
+  Rent: '#F97316', Other: '#6B7280',
+};
+
+const typeIconMap = {
+  reduce: <FiTrendingDown size={14} />,
+  increase_savings: <FiDollarSign size={14} />,
+  monitor: <FiEye size={14} />,
+  reduce_discretionary: <FiAlertTriangle size={14} />,
+  trend_warning: <FiTrendingUp size={14} />,
+  emergency_fund: <FiShield size={14} />,
+  optimize: <FiSettings size={14} />,
+  create: <FiPlusCircle size={14} />,
+  good: <FiCheckCircle size={14} />,
+};
 
 export default function AIInsights() {
   const navigate = useNavigate();
@@ -22,90 +60,72 @@ export default function AIInsights() {
   const [goals, setGoals] = useState([]);
   const [investments, setInvestments] = useState([]);
   const [backendRecs, setBackendRecs] = useState([]);
+  const [mlInsights, setMlInsights] = useState(null);
+  const [mlPredictions, setMlPredictions] = useState(null);
+  const [mlAvailable, setMlAvailable] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem('token')) { navigate('/login'); return; }
-
     let mounted = true;
     let interval;
-
     const load = async () => {
       try {
         const [sRes, iRes, eRes, bRes, gRes] = await Promise.all([
-          dashboardAPI.getSummary(),
-          incomeAPI.getAll(),
-          expenseAPI.getAll(),
-          budgetAPI.getAll(),
-          goalAPI.getAll(),
+          dashboardAPI.getSummary(), incomeAPI.getAll(), expenseAPI.getAll(),
+          budgetAPI.getAll(), goalAPI.getAll(),
         ]);
         if (mounted) {
-          setSummary(sRes.data);
-          setIncomes(iRes.data || []);
-          setExpenses(eRes.data || []);
-          setBudgets(bRes.data || []);
+          setSummary(sRes.data); setIncomes(iRes.data || []);
+          setExpenses(eRes.data || []); setBudgets(bRes.data || []);
           setGoals(gRes.data || []);
         }
+        try { const invRes = await investmentAPI.getAll(); if (mounted) setInvestments(invRes.data || []); } catch {}
+        try { const recRes = await analyticsAPI.getBudgetRecommendations(); if (mounted && recRes.data?.recommendations) setBackendRecs(recRes.data.recommendations); } catch {}
+        // ML service integration — graceful fallback if unavailable
         try {
-          const invRes = await investmentAPI.getAll();
-          if (mounted) setInvestments(invRes.data || []);
-        } catch {}
-        try {
-          const recRes = await analyticsAPI.getBudgetRecommendations();
-          if (mounted && recRes.data?.recommendations) {
-            setBackendRecs(recRes.data.recommendations);
+          const [healthRes, insightsRes] = await Promise.all([
+            mlAPI.getHealth(),
+            mlAPI.getFinancialInsights(),
+          ]);
+          if (mounted) {
+            const mlUp = healthRes.data?.mlServiceAvailable || false;
+            setMlAvailable(mlUp);
+            if (mlUp && insightsRes.data) {
+              setMlInsights(insightsRes.data);
+              setMlPredictions(insightsRes.data.predictions || null);
+            }
           }
-        } catch {}
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+        } catch {
+          if (mounted) setMlAvailable(false);
+        }
+      } catch (err) { console.error(err); }
+      finally { if (mounted) setLoading(false); }
     };
-
     load();
     interval = setInterval(load, 30000);
     window.addEventListener('focus', load);
-
     return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', load); };
   }, [navigate]);
 
   const computed = useMemo(() => {
     if (!summary) return null;
-
     const curMonth = getCurrentMonthKey();
     const prevMonth = getPreviousMonthKey();
-
-    const curMonthIncome = incomes
-      .filter(i => getMonthKey(i.date) === curMonth)
-      .reduce((s, i) => s + Number(i.amount || 0), 0);
-    const prevMonthIncome = incomes
-      .filter(i => getMonthKey(i.date) === prevMonth)
-      .reduce((s, i) => s + Number(i.amount || 0), 0);
-
-    const curMonthExpenses = expenses
-      .filter(e => getMonthKey(e.date) === curMonth)
-      .reduce((s, e) => s + Number(e.amount || 0), 0);
-    const prevMonthExpenses = expenses
-      .filter(e => getMonthKey(e.date) === prevMonth)
-      .reduce((s, e) => s + Number(e.amount || 0), 0);
-
+    const curMonthIncome = incomes.filter(i => getMonthKey(i.date) === curMonth).reduce((s, i) => s + Number(i.amount || 0), 0);
+    const prevMonthIncome = incomes.filter(i => getMonthKey(i.date) === prevMonth).reduce((s, i) => s + Number(i.amount || 0), 0);
+    const curMonthExpenses = expenses.filter(e => getMonthKey(e.date) === curMonth).reduce((s, e) => s + Number(e.amount || 0), 0);
+    const prevMonthExpenses = expenses.filter(e => getMonthKey(e.date) === prevMonth).reduce((s, e) => s + Number(e.amount || 0), 0);
     const totalIncome = summary.totalIncome || 0;
     const totalExpenses = summary.totalExpenses || 0;
     const savings = summary.savings || 0;
     const savingsRate = totalIncome > 0 ? ((savings / totalIncome) * 100) : 0;
-
     let expenseTrendPct = 0;
     let expenseTrendDir = 'flat';
     if (prevMonthExpenses > 0) {
       expenseTrendPct = Math.round(((curMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100);
       expenseTrendDir = expenseTrendPct > 0 ? 'up' : expenseTrendPct < 0 ? 'down' : 'flat';
-    } else if (curMonthExpenses > 0) {
-      expenseTrendPct = 100;
-      expenseTrendDir = 'up';
-    }
-
+    } else if (curMonthExpenses > 0) { expenseTrendPct = 100; expenseTrendDir = 'up'; }
     const budgetStatus = summary.budget.status;
-
     let aiScore = 50;
     if (savingsRate > 0) aiScore += Math.min(20, savingsRate * 0.5);
     if (budgetStatus === 'On Track') aiScore += 15;
@@ -115,50 +135,30 @@ export default function AIInsights() {
     if (curMonthExpenses < prevMonthExpenses && prevMonthExpenses > 0) aiScore += 5;
     if (totalExpenses < totalIncome) aiScore += 5;
     aiScore = Math.max(0, Math.min(100, Math.round(aiScore)));
-
     let scoreLabel = 'Needs Improvement';
     if (aiScore >= 80) scoreLabel = 'Excellent';
     else if (aiScore >= 60) scoreLabel = 'Good';
     else if (aiScore >= 40) scoreLabel = 'Average';
-
     let budgetHealth = 'On Track';
     let budgetHealthColor = 'success';
-    if (budgetStatus === 'Exceeded') { budgetHealth = 'Budget Exceeded'; budgetHealthColor = 'danger'; }
-    else if (budgetStatus === 'Near Limit') { budgetHealth = 'Warning'; budgetHealthColor = 'warning'; }
-
+    if (budgetStatus === 'Exceeded') { budgetHealth = 'Exceeded'; budgetHealthColor = 'danger'; }
+    else if (budgetStatus === 'Near Limit') { budgetHealth = 'Near Limit'; budgetHealthColor = 'warning'; }
     const expenseByCategory = {};
-    expenses.forEach(e => {
-      const cat = e.category || 'Other';
-      expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Number(e.amount || 0);
-    });
+    expenses.forEach(e => { const cat = e.category || 'Other'; expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Number(e.amount || 0); });
     const topCategory = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1])[0];
-
     const curMonthExpenseByCategory = {};
-    expenses
-      .filter(e => getMonthKey(e.date) === curMonth)
-      .forEach(e => {
-        const cat = e.category || 'Other';
-        curMonthExpenseByCategory[cat] = (curMonthExpenseByCategory[cat] || 0) + Number(e.amount || 0);
-      });
-
+    expenses.filter(e => getMonthKey(e.date) === curMonth).forEach(e => { const cat = e.category || 'Other'; curMonthExpenseByCategory[cat] = (curMonthExpenseByCategory[cat] || 0) + Number(e.amount || 0); });
     let overallPerformance = 'Needs Improvement';
     let overallPerformanceColor = 'danger';
     if (aiScore >= 80) { overallPerformance = 'Excellent'; overallPerformanceColor = 'success'; }
     else if (aiScore >= 60) { overallPerformance = 'Good'; overallPerformanceColor = 'info'; }
     else if (aiScore >= 40) { overallPerformance = 'Average'; overallPerformanceColor = 'warning'; }
-
     return {
-      aiScore, scoreLabel,
-      savingsRate,
-      expenseTrendPct, expenseTrendDir,
-      budgetHealth, budgetHealthColor,
-      curMonthIncome, prevMonthIncome,
-      curMonthExpenses, prevMonthExpenses,
-      totalIncome, totalExpenses, savings,
+      aiScore, scoreLabel, savingsRate, expenseTrendPct, expenseTrendDir,
+      budgetHealth, budgetHealthColor, curMonthIncome, prevMonthIncome,
+      curMonthExpenses, prevMonthExpenses, totalIncome, totalExpenses, savings,
       topCategory, expenseByCategory, curMonthExpenseByCategory,
-      overallPerformance, overallPerformanceColor,
-      goals,
-      investments,
+      overallPerformance, overallPerformanceColor, goals, investments,
     };
   }, [summary, incomes, expenses, budgets, goals, investments]);
 
@@ -166,14 +166,8 @@ export default function AIInsights() {
     if (!computed) return [];
     const recs = [];
     let id = 0;
-
-    const add = (priority, icon, title, text) => {
-      recs.push({ id: id++, priority, icon, title, text });
-    };
-
-    const { totalIncome, totalExpenses, savings, savingsRate,
-      curMonthIncome, prevMonthIncome, curMonthExpenses, prevMonthExpenses,
-      curMonthExpenseByCategory, goals: userGoals } = computed;
+    const add = (priority, icon, title, text) => { recs.push({ id: id++, priority, icon, title, text }); };
+    const { totalIncome, totalExpenses, savings, savingsRate, curMonthIncome, prevMonthIncome, curMonthExpenses, prevMonthExpenses, curMonthExpenseByCategory, goals: userGoals } = computed;
 
     if (totalExpenses > 0) {
       const sortedCats = Object.entries(curMonthExpenseByCategory).sort((a, b) => b[1] - a[1]);
@@ -182,39 +176,21 @@ export default function AIInsights() {
         const pctOfTotal = (amt / totalExpenses) * 100;
         if (pctOfTotal > 35) {
           const reduceAmt = Math.round(amt * 0.12);
-          add('critical', icons.alertCircle,
-            `${cat} dominates your spending`,
-            `You spent ${fmt(amt)} on ${cat} this month, which is ${pctOfTotal.toFixed(0)}% of total expenses. Try reducing it by 10-15% — that's about ${fmt(reduceAmt)} — to rebalance your budget.`
-          );
+          add('critical', icons.alertCircle, `${cat} dominates your spending`, `You spent ${fmt(amt)} on ${cat} this month (${pctOfTotal.toFixed(0)}% of total). Try reducing by 10-15% — about ${fmt(reduceAmt)} — to rebalance.`);
         } else if (pctOfTotal > 25) {
-          add('moderate', icons.barChart,
-            `${cat} is your top expense`,
-            `${cat} accounts for ${pctOfTotal.toFixed(0)}% of your spending at ${fmt(amt)}. Keep an eye on this category to prevent it from growing further.`
-          );
+          add('moderate', icons.barChart, `${cat} is your top expense`, `${cat} accounts for ${pctOfTotal.toFixed(0)}% at ${fmt(amt)}. Keep an eye on this category.`);
         }
       }
     }
 
     if (totalIncome > 0) {
       if (savingsRate < 20) {
-        const targetSavings = totalIncome * 0.2;
-        const gap = Math.round(targetSavings - savings);
-        if (gap > 0) {
-          add('critical', icons.target,
-            'Savings rate is below 20%',
-            `Your current savings rate is ${savingsRate.toFixed(1)}%. Save at least ${fmt(gap)} more this month to reach the recommended 20% savings rate.`
-          );
-        }
+        const gap = Math.round(totalIncome * 0.2 - savings);
+        if (gap > 0) add('critical', icons.target, 'Savings rate below 20%', `Your savings rate is ${savingsRate.toFixed(1)}%. Save at least ${fmt(gap)} more to reach the recommended 20%.`);
       } else if (savingsRate >= 20 && savingsRate < 40) {
-        add('good', icons.check,
-          'Healthy savings habit',
-          `You're saving ${savingsRate.toFixed(1)}% of your income — that's a solid financial habit. Keep maintaining this discipline.`
-        );
+        add('good', icons.check, 'Healthy savings habit', `You're saving ${savingsRate.toFixed(1)}% of income — a solid financial habit. Keep it up!`);
       } else if (savingsRate >= 40) {
-        add('good', icons.trendingUp,
-          'Excellent savings rate',
-          `At ${savingsRate.toFixed(1)}%, your savings rate is outstanding. Consider investing a portion in SIPs, mutual funds, or index funds to grow your wealth faster.`
-        );
+        add('good', icons.trendingUp, 'Excellent savings rate', `At ${savingsRate.toFixed(1)}%, consider investing a portion in SIPs or mutual funds to grow wealth faster.`);
       }
     }
 
@@ -228,79 +204,31 @@ export default function AIInsights() {
         const pct = b.limit > 0 ? (spent / b.limit) * 100 : 0;
         const overBy = Math.round(spent - b.limit);
         if (pct >= 100 && overBy > 0) {
-          add('critical', icons.alertCircle,
-            `${b.category} exceeded budget`,
-            `You exceeded your ${b.category} budget by ${fmt(overBy)} this month. Consider cutting back or adjusting next month's budget.`
-          );
+          add('critical', icons.alertCircle, `${b.category} exceeded budget`, `You exceeded by ${fmt(overBy)}. Consider cutting back.`);
           anyExceeded = true;
-        } else if (pct >= 80) {
-          anyNearLimit = true;
-        }
+        } else if (pct >= 80) anyNearLimit = true;
       });
-      if (!anyExceeded && anyNearLimit) {
-        add('moderate', icons.alertCircle,
-          'Some budgets nearing limit',
-          'One or more budget categories are above 80% usage. Monitor these closely to avoid overspending.'
-        );
-      }
-      if (!anyExceeded && !anyNearLimit) {
-        add('good', icons.check,
-          'All budgets under control',
-          'Your spending is within budget limits across all categories. Great financial discipline!'
-        );
-      }
+      if (!anyExceeded && anyNearLimit) add('moderate', icons.alertCircle, 'Budgets nearing limit', 'Some categories are above 80%. Monitor closely.');
+      if (!anyExceeded && !anyNearLimit) add('good', icons.check, 'All budgets on track', 'Spending within limits across all categories!');
     }
 
     if (prevMonthExpenses > 0) {
-      const diff = curMonthExpenses - prevMonthExpenses;
-      const pctChange = Math.round((diff / prevMonthExpenses) * 100);
-      if (pctChange > 5) {
-        add('critical', icons.trendingUp,
-          `Expenses increased by ${pctChange}%`,
-          `Your expenses rose from ${fmt(prevMonthExpenses)} to ${fmt(curMonthExpenses)} compared to last month. Review your spending patterns to identify areas to cut.`
-        );
-      } else if (pctChange < -5) {
-        add('good', icons.trendingDown,
-          `Expenses reduced by ${Math.abs(pctChange)}%`,
-          `Great job! Your expenses dropped from ${fmt(prevMonthExpenses)} to ${fmt(curMonthExpenses)} — a ${Math.abs(pctChange)}% improvement from last month.`
-        );
-      }
+      const pctChange = Math.round(((curMonthExpenses - prevMonthExpenses) / prevMonthExpenses) * 100);
+      if (pctChange > 5) add('critical', icons.trendingUp, `Expenses up ${pctChange}%`, `Rose from ${fmt(prevMonthExpenses)} to ${fmt(curMonthExpenses)}. Review spending patterns.`);
+      else if (pctChange < -5) add('good', icons.trendingDown, `Expenses down ${Math.abs(pctChange)}%`, `Great! Dropped from ${fmt(prevMonthExpenses)} to ${fmt(curMonthExpenses)}.`);
     }
 
     if (prevMonthIncome > 0) {
-      const diff = curMonthIncome - prevMonthIncome;
-      const pctChange = Math.round((diff / prevMonthIncome) * 100);
-      if (pctChange < -10) {
-        add('critical', icons.trendingDown,
-          `Income decreased by ${Math.abs(pctChange)}%`,
-          `Your income dropped from ${fmt(prevMonthIncome)} to ${fmt(curMonthIncome)}. Monitor your spending carefully and consider diversifying income sources.`
-        );
-      } else if (pctChange > 10) {
-        add('good', icons.trendingUp,
-          `Income increased by ${pctChange}%`,
-          `Income grew from ${fmt(prevMonthIncome)} to ${fmt(curMonthIncome)}. Consider allocating the extra income towards savings or debt repayment.`
-        );
-      }
+      const pctChange = Math.round(((curMonthIncome - prevMonthIncome) / prevMonthIncome) * 100);
+      if (pctChange < -10) add('critical', icons.trendingDown, `Income down ${Math.abs(pctChange)}%`, `Dropped from ${fmt(prevMonthIncome)} to ${fmt(curMonthIncome)}. Diversify income sources.`);
+      else if (pctChange > 10) add('good', icons.trendingUp, `Income up ${pctChange}%`, `Grew from ${fmt(prevMonthIncome)} to ${fmt(curMonthIncome)}. Allocate extra towards savings.`);
     }
 
     if (health) {
       const { score } = health;
-      if (score < 60) {
-        add('critical', icons.shield,
-          'Financial health needs attention',
-          `Your financial health score is ${score}/100. Focus on increasing income, reducing unnecessary expenses, and building an emergency fund covering 3-6 months of expenses.`
-        );
-      } else if (score >= 60 && score < 80) {
-        add('moderate', icons.shield,
-          'Financial health is fair',
-          `Your score is ${score}/100. You're on the right track — try to boost your savings rate and keep debt levels low to push into the "Excellent" range.`
-        );
-      } else if (score >= 80) {
-        add('good', icons.shield,
-          'Excellent financial health',
-          `Your score is ${score}/100. Your finances are in great shape. Keep diversifying investments and maintaining your savings discipline.`
-        );
-      }
+      if (score < 60) add('critical', icons.shield, 'Health needs attention', `Score: ${score}/100. Focus on increasing income and building emergency fund.`);
+      else if (score >= 60 && score < 80) add('moderate', icons.shield, 'Health is fair', `Score: ${score}/100. Boost savings rate to push into Excellent range.`);
+      else if (score >= 80) add('good', icons.shield, 'Excellent health', `Score: ${score}/100. Great shape! Keep diversifying investments.`);
     }
 
     if (userGoals && userGoals.length > 0) {
@@ -314,401 +242,275 @@ export default function AIInsights() {
         const targetDate = new Date(g.targetDate);
         const monthsLeft = Math.max(1, Math.ceil((targetDate - now) / (1000 * 60 * 60 * 24 * 30)));
         const needed = Math.ceil(remaining / monthsLeft);
-
-        if (pct < 40 && remaining > 0) {
-          add('moderate', icons.target,
-            `${g.goalName} needs attention`,
-            `You've saved ${pct.toFixed(0)}% of your ${fmt(target)} goal. Increase monthly savings to at least ${fmt(needed)} to reach it by the target date.`
-          );
-        } else if (pct >= 80 && pct < 100) {
-          add('good', icons.check,
-            `${g.goalName} is almost complete`,
-            `You're ${pct.toFixed(0)}% there with ${fmt(remaining)} remaining. Just a bit more — keep the momentum going!`
-          );
-        } else if (pct >= 100) {
-          add('good', icons.check,
-            `${g.goalName} achieved!`,
-            `Congratulations! You've reached your ${fmt(target)} savings goal. Consider setting a new goal to keep growing your wealth.`
-          );
-        }
+        if (pct < 40 && remaining > 0) add('moderate', icons.target, `${g.goalName} needs attention`, `Saved ${pct.toFixed(0)}% of ${fmt(target)}. Save ${fmt(needed)}/month to reach it.`);
+        else if (pct >= 80 && pct < 100) add('good', icons.check, `${g.goalName} almost done`, `${pct.toFixed(0)}% there with ${fmt(remaining)} remaining!`);
+        else if (pct >= 100) add('good', icons.check, `${g.goalName} achieved!`, `Congrats! You reached your ${fmt(target)} goal.`);
       });
     }
 
-    if (totalIncome > 0) {
-      const spendRatio = (totalExpenses / totalIncome) * 100;
-      if (spendRatio > 90) {
-        add('critical', icons.alertCircle,
-          'Spending almost matches income',
-          `You're spending ${spendRatio.toFixed(0)}% of your income. This leaves little room for savings or emergencies. Aim to keep expenses below 70-80% of income.`
-        );
-      }
+    if (totalIncome > 0 && (totalExpenses / totalIncome) > 0.9) {
+      add('critical', icons.alertCircle, 'Spending matches income', `Spending ${(totalExpenses / totalIncome * 100).toFixed(0)}% of income. Keep below 70-80%.`);
     }
 
     const userInvestments = computed?.investments || [];
     if (userInvestments.length > 0) {
-      const activeInvestments = userInvestments.filter(inv => inv.status === 'active');
-      const totalInvested = activeInvestments.reduce((s, inv) => s + (inv.amount || 0), 0);
-      const totalCurrentValue = activeInvestments.reduce((s, inv) => s + (inv.currentValue != null ? inv.currentValue : (inv.amount || 0)), 0);
-      const overallReturn = totalInvested > 0 ? ((totalCurrentValue - totalInvested) / totalInvested) * 100 : 0;
-
-      if (overallReturn < -5) {
-        add('critical', icons.trendingDown,
-          'Investment portfolio declining',
-          `Your portfolio is down ${Math.abs(overallReturn).toFixed(1)}%. Review underperforming investments and consider rebalancing your portfolio.`
-        );
-      } else if (overallReturn > 15) {
-        add('good', icons.trendingUp,
-          'Strong investment performance',
-          `Your portfolio is up ${overallReturn.toFixed(1)}%. Consider booking partial profits and diversifying into other asset classes.`
-        );
-      }
-
-      if (activeInvestments.length === 1) {
-        add('moderate', icons.alertCircle,
-          'Concentrated portfolio risk',
-          'You only have 1 active investment. Diversify across different asset classes (mutual funds, stocks, FDs, bonds) to reduce risk.'
-        );
-      }
-
-      if (totalInvested > 0 && computed.savingsRate > 20) {
-        const monthlySavings = computed.savings - (computed.savings * 0.1);
-        if (monthlySavings > 0) {
-          add('good', icons.piggyBank,
-            'Consider increasing SIP',
-            `With a ${computed.savingsRate.toFixed(0)}% savings rate, consider starting a monthly SIP of ${fmt(Math.round(monthlySavings * 0.2))} in mutual funds or index funds.`
-          );
-        }
-      }
-
-      const types = [...new Set(activeInvestments.map(inv => inv.type))];
-      if (types.length <= 2 && activeInvestments.length >= 2) {
-        add('moderate', icons.pieChart,
-          'Low diversification',
-          `Your investments span only ${types.length} asset class${types.length > 1 ? 'es' : ''}. Consider adding bonds, gold, or real estate for better diversification.`
-        );
-      }
-    } else if (totalIncome > 0 && computed.savingsRate > 10) {
-      add('moderate', icons.piggyBank,
-        'Start investing',
-        `You're saving ${computed.savingsRate.toFixed(0)}% of income. Consider starting with SIPs in index funds or mutual funds to grow your wealth.`
-      );
+      const active = userInvestments.filter(inv => inv.status === 'active');
+      const totalInv = active.reduce((s, inv) => s + (inv.amount || 0), 0);
+      const totalCurr = active.reduce((s, inv) => s + (inv.currentValue != null ? inv.currentValue : (inv.amount || 0)), 0);
+      const overallReturn = totalInv > 0 ? ((totalCurr - totalInv) / totalInv) * 100 : 0;
+      if (overallReturn < -5) add('critical', icons.trendingDown, 'Portfolio declining', `Down ${Math.abs(overallReturn).toFixed(1)}%. Review and rebalance.`);
+      else if (overallReturn > 15) add('good', icons.trendingUp, 'Strong performance', `Up ${overallReturn.toFixed(1)}%. Consider booking partial profits.`);
+      if (active.length === 1) add('moderate', icons.alertCircle, 'Concentrated risk', 'Only 1 investment. Diversify across asset classes.');
+      const types = [...new Set(active.map(inv => inv.type))];
+      if (types.length <= 2 && active.length >= 2) add('moderate', icons.pieChart, 'Low diversification', `Only ${types.length} asset class(es). Add bonds, gold, or real estate.`);
+    } else if (totalIncome > 0 && savingsRate > 10) {
+      add('moderate', icons.piggyBank, 'Start investing', `Saving ${savingsRate.toFixed(0)}%. Consider SIPs in index funds.`);
     }
 
-    const allExpenses = computed?.expenseByCategory || {};
-    const totalExp = Object.values(allExpenses).reduce((s, v) => s + v, 0);
-    if (totalExp > 0) {
-      const sortedCats = Object.entries(allExpenses).sort((a, b) => b[1] - a[1]);
-      const discretionaryCats = ['Shopping', 'Entertainment', 'Travel'];
-      const discretionaryTotal = sortedCats.filter(([cat]) => discretionaryCats.includes(cat)).reduce((s, [, v]) => s + v, 0);
-      const discretionaryPct = (discretionaryTotal / totalExp) * 100;
-      if (discretionaryPct > 30) {
-        add('moderate', icons.alertCircle,
-          'High discretionary spending',
-          `Discretionary expenses (Shopping, Entertainment, Travel) make up ${discretionaryPct.toFixed(0)}% of your spending. Consider reducing these by 10-15%.`
-        );
-      }
+    const discretionaryCats = ['Shopping', 'Entertainment', 'Travel'];
+    const discretionaryTotal = Object.entries(computed.expenseByCategory).filter(([cat]) => discretionaryCats.includes(cat)).reduce((s, [, v]) => s + v, 0);
+    if (totalExpenses > 0 && (discretionaryTotal / totalExpenses) > 0.3) {
+      add('moderate', icons.alertCircle, 'High discretionary spending', `Shopping/Entertainment/Travel = ${((discretionaryTotal / totalExpenses) * 100).toFixed(0)}%. Reduce by 10-15%.`);
     }
 
     const priorityOrder = { critical: 0, moderate: 1, good: 2 };
     recs.sort((a, b) => (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3));
-
-    // Merge with backend recommendations (backend takes priority)
     const backendMapped = backendRecs.map(rec => ({
-      id: `backend-${rec.id}`,
-      priority: rec.priority === 'high' ? 'critical' : rec.priority === 'medium' ? 'moderate' : 'good',
-      icon: rec.type === 'reduce' ? icons.trendingDown
-        : rec.type === 'increase_savings' ? icons.piggyBank
-        : rec.type === 'reduce_discretionary' ? icons.alertCircle
-        : rec.type === 'trend_warning' ? icons.trendingUp
-        : rec.type === 'emergency_fund' ? icons.shield
-        : rec.type === 'optimize' ? icons.barChart
-        : rec.type === 'monitor' ? icons.eye
-        : rec.type === 'create' ? icons.plus
-        : rec.type === 'good' ? icons.check
-        : icons.send,
-      title: rec.title,
-      text: rec.message,
-      category: rec.category,
-      backendData: rec,
+      id: `backend-${rec.id}`, priority: rec.priority === 'high' ? 'critical' : rec.priority === 'medium' ? 'moderate' : 'good',
+      icon: typeIconMap[rec.type] || <FiZap size={14} />, title: rec.title, text: rec.message, category: rec.category,
     }));
-
-    // Deduplicate: if backend has a rec for the same category, use backend version
-    const catSeen = new Set(backendMapped.map(r => r.category).filter(Boolean));
+    // ML-generated recommendations
+    const mlRecs = (mlInsights?.recommendations || []).map((rec, i) => ({
+      id: `ml-${i}`, priority: rec.priority === 'high' ? 'critical' : rec.priority === 'medium' ? 'moderate' : 'good',
+      icon: <FiCpu size={14} />, title: rec.title, text: rec.message, category: rec.type, source: 'ml',
+    }));
+    const allSources = [...mlRecs, ...backendMapped];
+    const catSeen = new Set(allSources.map(r => r.category).filter(Boolean));
     const clientFiltered = recs.filter(r => !r.category || !catSeen.has(r.category));
-
-    const merged = [...backendMapped, ...clientFiltered];
+    const merged = [...allSources, ...clientFiltered];
     merged.sort((a, b) => (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3));
+    return merged.slice(0, 10);
+  }, [computed, budgets, backendRecs, health, mlInsights]);
 
-    return merged.slice(0, 8);
-  }, [computed, budgets, backendRecs, health]);
+  const monthlyData = useMemo(() => {
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(d.toISOString().slice(0, 7));
+    }
+    const incByMonth = {};
+    const expByMonth = {};
+    months.forEach(m => { incByMonth[m] = 0; expByMonth[m] = 0; });
+    incomes.forEach(inc => { const m = new Date(inc.date).toISOString().slice(0, 7); if (incByMonth[m] !== undefined) incByMonth[m] += Number(inc.amount || 0); });
+    expenses.forEach(exp => { const m = new Date(exp.date).toISOString().slice(0, 7); if (expByMonth[m] !== undefined) expByMonth[m] += Number(exp.amount || 0); });
+    return {
+      labels: months.map(m => { const [y, mo] = m.split('-'); return new Date(y, mo - 1).toLocaleDateString('en-US', { month: 'short' }); }),
+      income: months.map(m => incByMonth[m]), expenses: months.map(m => expByMonth[m]),
+    };
+  }, [incomes, expenses]);
 
-  if (loading) return <Layout title="AI Insights"><LoadingSpinner text="Analyzing your finances..." /></Layout>;
-  if (!computed) return <Layout title="AI Insights"><LoadingSpinner text="Loading data..." /></Layout>;
+  if (loading) return <Layout title="AI Financial Insights"><LoadingSpinner text="Analyzing your finances with AI..." /></Layout>;
+  if (!computed) return <Layout title="AI Financial Insights"><LoadingSpinner text="Loading data..." /></Layout>;
 
-  const summaryCards = [
-    {
-      title: 'AI Score',
-      value: `${computed.aiScore}/100`,
-      subtitle: computed.scoreLabel,
-      gradient: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))',
-      color: 'var(--purple-light)',
-      icon: icons.brain,
-      badgeColor: computed.aiScore >= 70 ? 'success' : computed.aiScore >= 40 ? 'warning' : 'danger',
-    },
-    {
-      title: 'Savings Rate',
-      value: `${computed.savingsRate.toFixed(1)}%`,
-      subtitle: computed.savingsRate >= 20 ? 'Excellent' : computed.savingsRate >= 10 ? 'Good' : computed.savingsRate > 0 ? 'Fair' : 'Neutral',
-      gradient: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.04))',
-      color: 'var(--success-light)',
-      icon: icons.piggyBank,
-      badgeColor: computed.savingsRate >= 20 ? 'success' : computed.savingsRate >= 10 ? 'info' : 'warning',
-    },
-    {
-      title: 'Expense Trend',
-      value: computed.expenseTrendDir === 'flat' ? '0%' : `${Math.abs(computed.expenseTrendPct)}%`,
-      subtitle: computed.expenseTrendDir === 'down'
-        ? 'Lower than last month'
-        : computed.expenseTrendDir === 'up'
-          ? 'Higher than last month'
-          : 'Same as last month',
-      gradient: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))',
-      color: 'var(--warning-light)',
-      icon: computed.expenseTrendDir === 'down' ? icons.trendingDown : icons.trendingUp,
-      badgeColor: computed.expenseTrendDir === 'down' ? 'success' : computed.expenseTrendDir === 'up' ? 'danger' : 'info',
-    },
-    {
-      title: 'Budget Health',
-      value: computed.budgetHealth,
-      subtitle: `${Math.round(computed.totalIncome > 0 ? (computed.totalExpenses / computed.totalIncome) * 100 : 0)}% of income spent`,
-      gradient: computed.budgetHealthColor === 'success'
-        ? 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.04))'
-        : computed.budgetHealthColor === 'warning'
-          ? 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))'
-          : 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04))',
-      color: computed.budgetHealthColor === 'success'
-        ? 'var(--success-light)'
-        : computed.budgetHealthColor === 'warning'
-          ? 'var(--warning-light)'
-          : 'var(--danger-light)',
-      icon: icons.target,
-      badgeColor: computed.budgetHealthColor,
-    },
-  ];
+  const monthlyTrendData = {
+    labels: monthlyData.labels,
+    datasets: [
+      { label: 'Income', data: monthlyData.income, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#10B981', pointBorderColor: '#111827', pointBorderWidth: 2 },
+      { label: 'Expenses', data: monthlyData.expenses, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#EF4444', pointBorderColor: '#111827', pointBorderWidth: 2 },
+    ],
+  };
 
-  const analysisInsights = [];
+  const monthlyTrendOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top', labels: { color: '#94A3B8', usePointStyle: true, pointStyle: 'circle', padding: 16, font: { size: 12 } } },
+      tooltip: { backgroundColor: '#1E293B', titleColor: '#F1F5F9', bodyColor: '#94A3B8', borderColor: '#334155', borderWidth: 1, cornerRadius: 8, padding: 12, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.raw)}` } } },
+    scales: { x: { grid: { color: 'rgba(51,65,85,0.2)', drawBorder: false }, ticks: { color: '#64748B', font: { size: 11 } } }, y: { grid: { color: 'rgba(51,65,85,0.2)', drawBorder: false }, ticks: { color: '#64748B', font: { size: 11 }, callback: (v) => `₹${(v / 1000).toFixed(0)}k` } } },
+  };
 
-  if (computed.topCategory) {
-    analysisInsights.push({
-      icon: icons.barChart,
-      label: 'Highest expense category',
-      value: `${computed.topCategory[0]} — ${fmt(computed.topCategory[1])}`,
-      color: 'var(--danger-light)',
-    });
-  }
+  const catLabels = Object.keys(computed.expenseByCategory);
+  const catValues = Object.values(computed.expenseByCategory);
+  const catColors = ['#EF4444', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899', '#10B981', '#6366F1', '#14B8A6', '#F97316', '#6B7280'];
 
-  analysisInsights.push({
-    icon: icons.trendingUp,
-    label: 'Total income this month',
-    value: fmt(computed.curMonthIncome),
-    color: 'var(--success-light)',
-  });
+  const doughnutData = {
+    labels: catLabels.length > 0 ? catLabels : ['No Data'],
+    datasets: [{ data: catValues.length > 0 ? catValues : [1], backgroundColor: catLabels.length > 0 ? catColors.slice(0, catLabels.length) : ['#334155'], borderColor: '#111827', borderWidth: 3, hoverOffset: 6 }],
+  };
 
-  analysisInsights.push({
-    icon: icons.trendingDown,
-    label: 'Total expenses this month',
-    value: fmt(computed.curMonthExpenses),
-    color: 'var(--danger-light)',
-  });
+  const doughnutOptions = { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1E293B', titleColor: '#F1F5F9', bodyColor: '#94A3B8', borderColor: '#334155', borderWidth: 1, cornerRadius: 8, padding: 12, callbacks: { label: (ctx) => `${ctx.label}: ${fmt(ctx.raw)}` } } } };
 
-  analysisInsights.push({
-    icon: icons.piggyBank,
-    label: 'Total savings this month',
-    value: fmt(computed.curMonthIncome - computed.curMonthExpenses),
-    color: computed.curMonthIncome - computed.curMonthExpenses >= 0 ? 'var(--success-light)' : 'var(--danger-light)',
-  });
-
-  if (computed.prevMonthIncome > 0) {
-    const incChange = computed.curMonthIncome - computed.prevMonthIncome;
-    analysisInsights.push({
-      icon: incChange >= 0 ? icons.trendingUp : icons.trendingDown,
-      label: 'Income vs last month',
-      value: incChange >= 0 ? `↑ ${fmt(incChange)} higher` : `↓ ${fmt(Math.abs(incChange))} lower`,
-      color: incChange >= 0 ? 'var(--success-light)' : 'var(--danger-light)',
-    });
-  }
-
-  if (computed.prevMonthExpenses > 0) {
-    const expChange = computed.curMonthExpenses - computed.prevMonthExpenses;
-    analysisInsights.push({
-      icon: expChange <= 0 ? icons.trendingDown : icons.trendingUp,
-      label: 'Expenses vs last month',
-      value: expChange <= 0 ? `↓ ${fmt(Math.abs(expChange))} lower` : `↑ ${fmt(expChange)} higher`,
-      color: expChange <= 0 ? 'var(--success-light)' : 'var(--danger-light)',
-    });
-  }
-
-  analysisInsights.push({
-    icon: icons.activity,
-    label: 'Overall financial performance',
-    value: computed.overallPerformance,
-    color: computed.overallPerformanceColor === 'success' ? 'var(--success-light)' : computed.overallPerformanceColor === 'info' ? 'var(--accent-light)' : computed.overallPerformanceColor === 'warning' ? 'var(--warning-light)' : 'var(--danger-light)',
-  });
-
-  analysisInsights.push({
-    icon: icons.shield,
-    label: 'Savings habit',
-    value: computed.savingsRate >= 10
-      ? 'Maintaining healthy savings'
-      : 'Consider improving savings',
-    color: computed.savingsRate >= 10 ? 'var(--success-light)' : 'var(--warning-light)',
-  });
+  const aiColor = computed.aiScore >= 80 ? '#10B981' : computed.aiScore >= 60 ? '#3B82F6' : computed.aiScore >= 40 ? '#F59E0B' : '#EF4444';
+  const aiBadge = computed.aiScore >= 80 ? 'success' : computed.aiScore >= 60 ? 'info' : computed.aiScore >= 40 ? 'warning' : 'danger';
 
   return (
-    <Layout title="AI Insights">
-      <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-          AI-powered analysis based on your financial data
-        </h3>
-      </div>
+    <Layout title="AI Financial Insights">
+      {/* Hero Banner */}
+      <Card style={{ marginBottom: '16px', background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.08))', border: '1px solid rgba(139,92,246,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '16px', background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <FiCpu size={28} color="#fff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px' }}>AI-Powered Financial Intelligence</h2>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Personalized insights based on your income, expenses, savings, investments & goals</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {mlAvailable && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: 999, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', fontSize: '0.68rem', fontWeight: 600, color: '#A78BFA' }}>
+                <FiCpu size={11} />
+                ML Active
+              </div>
+            )}
+            <div style={{ position: 'relative', width: 70, height: 70 }}>
+              <svg width={70} height={70} style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx={35} cy={35} r={28} fill="none" stroke="var(--border)" strokeWidth={6} />
+                <circle cx={35} cy={35} r={28} fill="none" stroke={aiColor} strokeWidth={6} strokeDasharray={2 * Math.PI * 28} strokeDashoffset={2 * Math.PI * 28 * (1 - computed.aiScore / 100)} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s ease' }} />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: aiColor }}>{computed.aiScore}</span>
+                <span style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>/100</span>
+              </div>
+            </div>
+            <div>
+              <Badge color={aiBadge} dot>{computed.scoreLabel}</Badge>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>AI Score</div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px', marginBottom: '28px' }}>
-        {summaryCards.map((card, i) => (
-          <Card key={i} hoverable style={{ background: card.gradient, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: -8, right: -8, opacity: 0.08 }}>
-              <Icon path={card.icon} size={80} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>{card.title}</span>
-              <Badge color={card.badgeColor} dot>{card.subtitle}</Badge>
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: card.color }}>
-              {card.value}
+      {/* 4 Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+        {[
+          { label: 'Total Income', value: fmt(computed.totalIncome), icon: <FiTrendingUp size={18} />, color: 'var(--success-light)', bg: 'rgba(16,185,129,0.12)', change: computed.prevMonthIncome > 0 ? Math.round(((computed.curMonthIncome - computed.prevMonthIncome) / computed.prevMonthIncome) * 100) : null },
+          { label: 'Total Expenses', value: fmt(computed.totalExpenses), icon: <FiTrendingDown size={18} />, color: 'var(--danger-light)', bg: 'rgba(239,68,68,0.12)', change: computed.prevMonthExpenses > 0 ? Math.round(((computed.curMonthExpenses - computed.prevMonthExpenses) / computed.prevMonthExpenses) * 100) : null },
+          { label: 'Net Savings', value: fmt(computed.savings), icon: <FiDollarSign size={18} />, color: computed.savings >= 0 ? 'var(--success-light)' : 'var(--danger-light)', bg: computed.savings >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', sub: `${computed.savingsRate.toFixed(1)}% rate` },
+          { label: 'Budget Status', value: computed.budgetHealth, icon: <FiTarget size={18} />, color: computed.budgetHealthColor === 'success' ? 'var(--success-light)' : computed.budgetHealthColor === 'warning' ? 'var(--warning-light)' : 'var(--danger-light)', bg: computed.budgetHealthColor === 'success' ? 'rgba(16,185,129,0.12)' : computed.budgetHealthColor === 'warning' ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)' },
+        ].map((s, i) => (
+          <Card key={i} style={{ padding: '18px 20px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: -6, right: -6, opacity: 0.06 }}>{s.icon}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>{s.icon}</div>
+              <div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
+                {s.change !== null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', fontWeight: 600, color: s.change >= 0 ? 'var(--success-light)' : 'var(--danger-light)', marginTop: '2px' }}>
+                    {s.change >= 0 ? <FiArrowUp size={10} /> : <FiArrowDown size={10} />}
+                    {Math.abs(s.change)}% vs last month
+                  </div>
+                )}
+                {s.sub && <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>{s.sub}</div>}
+              </div>
             </div>
           </Card>
         ))}
       </div>
 
-      {/* Two-column layout: Analysis + Recommendations */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', alignItems: 'stretch' }}>
+      {/* Two Column: AI Analysis + Recommendations */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '16px', marginBottom: '0' }}>
         {/* Left: AI Financial Analysis */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 'var(--radius-md)',
-              background: 'var(--purple-glow)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon path={icons.brain} size={18} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FiBarChart2 size={16} />
             </div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              Smart Financial Analysis
-            </h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Smart Financial Analysis</h2>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {analysisInsights.map((item, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '12px 14px', borderRadius: 'var(--radius-md)',
-                  transition: 'all var(--transition-fast)',
-                }}
+          {/* Quick Stats Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+            {[
+              { label: 'Income', value: fmt(computed.curMonthIncome), color: 'var(--success-light)', bg: 'rgba(16,185,129,0.08)' },
+              { label: 'Expenses', value: fmt(computed.curMonthExpenses), color: 'var(--danger-light)', bg: 'rgba(239,68,68,0.08)' },
+              { label: 'Savings', value: fmt(computed.curMonthIncome - computed.curMonthExpenses), color: (computed.curMonthIncome - computed.curMonthExpenses) >= 0 ? 'var(--success-light)' : 'var(--danger-light)', bg: (computed.curMonthIncome - computed.curMonthExpenses) >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)' },
+            ].map((item, i) => (
+              <div key={i} style={{ padding: '10px', borderRadius: 'var(--radius-md)', background: item.bg, border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: item.color }}>{item.value}</div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Analysis Items */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {[
+              { icon: <FiBarChart2 size={13} />, label: 'Top expense', value: computed.topCategory ? `${computed.topCategory[0]} — ${fmt(computed.topCategory[1])}` : 'N/A', color: 'var(--danger-light)' },
+              { icon: computed.expenseTrendDir === 'down' ? <FiArrowDown size={13} /> : <FiArrowUp size={13} />, label: 'Expense trend', value: computed.expenseTrendDir === 'flat' ? 'Same as last month' : `${Math.abs(computed.expenseTrendPct)}% ${computed.expenseTrendDir === 'down' ? 'lower' : 'higher'}`, color: computed.expenseTrendDir === 'down' ? 'var(--success-light)' : 'var(--danger-light)' },
+              { icon: <FiTarget size={13} />, label: 'Budget status', value: computed.budgetHealth, color: computed.budgetHealthColor === 'success' ? 'var(--success-light)' : computed.budgetHealthColor === 'warning' ? 'var(--warning-light)' : 'var(--danger-light)' },
+              { icon: <FiDollarSign size={13} />, label: 'Savings rate', value: `${computed.savingsRate.toFixed(1)}%`, color: computed.savingsRate >= 20 ? 'var(--success-light)' : computed.savingsRate >= 10 ? 'var(--accent-light)' : 'var(--warning-light)' },
+              { icon: <FiActivity size={13} />, label: 'Performance', value: computed.overallPerformance, color: computed.overallPerformanceColor === 'success' ? 'var(--success-light)' : computed.overallPerformanceColor === 'info' ? 'var(--accent-light)' : 'var(--warning-light)' },
+              { icon: <FiShield size={13} />, label: 'Financial health', value: health ? `${health.score}/100 — ${health.status}` : 'N/A', color: health ? (health.score >= 80 ? 'var(--success-light)' : health.score >= 60 ? 'var(--accent-light)' : 'var(--warning-light)') : 'var(--text-muted)' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', borderRadius: 'var(--radius-md)', transition: 'all var(--transition-fast)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-glass)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{
-                  width: 32, height: 32, borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-glass)', border: '1px solid var(--border-light)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  <Icon path={item.icon} size={14} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '2px' }}>{item.label}</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: item.color }}>{item.value}</div>
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                <div style={{ width: 26, height: 26, borderRadius: 'var(--radius-sm)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--text-muted)' }}>{item.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{item.label}</div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: item.color }}>{item.value}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          <div style={{
-            marginTop: '20px', paddingTop: '16px',
-            borderTop: '1px solid var(--border-light)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              Overall Financial Performance
-            </span>
-            <Badge color={computed.overallPerformanceColor} dot>{computed.overallPerformance}</Badge>
-          </div>
+          {/* Goals Progress */}
+          {computed.goals && computed.goals.length > 0 && (
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Goal Progress</div>
+              {computed.goals.slice(0, 3).map((g, i) => {
+                const pct = g.targetAmount > 0 ? Math.min(100, Math.round((g.savedAmount / g.targetAmount) * 100)) : 0;
+                return (
+                  <div key={i} style={{ marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)' }}>{g.goalName}</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: pct >= 80 ? 'var(--success-light)' : 'var(--text-muted)' }}>{pct}%</span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 999, width: `${pct}%`, background: pct >= 80 ? 'var(--success)' : pct >= 40 ? 'var(--accent)' : 'var(--warning)', transition: 'width 0.8s ease' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
 
         {/* Right: AI Recommendations */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 'var(--radius-md)',
-              background: 'var(--accent-glow)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon path={icons.send} size={18} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FiZap size={16} />
             </div>
             <div style={{ flex: 1 }}>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                AI Recommendations
-              </h2>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {recommendations.length} insight{recommendations.length !== 1 ? 's' : ''} based on your data
-              </span>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>AI Recommendations</h2>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{recommendations.length} insight{recommendations.length !== 1 ? 's' : ''} generated</span>
             </div>
           </div>
-
           {recommendations.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
-              <Icon path={icons.check} size={32} />
-              <p style={{ marginTop: '12px', fontSize: '0.9rem' }}>Your finances look balanced. Keep monitoring your spending.</p>
+              <FiCheckCircle size={32} style={{ margin: '0 auto 12px' }} />
+              <p style={{ fontSize: '0.9rem' }}>Your finances look balanced!</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {recommendations.map((rec) => {
-                const priorityConfig = {
-                  critical: { bg: 'var(--danger-glow)', border: 'rgba(239,68,68,0.3)', dot: 'var(--danger)', badge: 'danger', label: 'Critical' },
-                  moderate: { bg: 'var(--warning-glow)', border: 'rgba(245,158,11,0.3)', dot: 'var(--warning)', badge: 'warning', label: 'Moderate' },
-                  good: { bg: 'var(--success-glow)', border: 'rgba(16,185,129,0.3)', dot: 'var(--success)', badge: 'success', label: 'Good' },
-                };
-                const pc = priorityConfig[rec.priority] || priorityConfig.moderate;
+                const pc = rec.priority === 'critical' ? { bg: 'var(--danger-glow)', border: 'rgba(239,68,68,0.3)', dot: 'var(--danger)', badge: 'danger', label: 'Critical' }
+                  : rec.priority === 'moderate' ? { bg: 'var(--warning-glow)', border: 'rgba(245,158,11,0.3)', dot: 'var(--warning)', badge: 'warning', label: 'Moderate' }
+                  : { bg: 'var(--success-glow)', border: 'rgba(16,185,129,0.3)', dot: 'var(--success)', badge: 'success', label: 'Good' };
                 return (
-                  <div
-                    key={rec.id}
-                    style={{
-                      display: 'flex', gap: '14px',
-                      padding: '16px', borderRadius: 'var(--radius-lg)',
-                      background: pc.bg, border: `1px solid ${pc.border}`,
-                      transition: 'all var(--transition-fast)',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-                  >
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 'var(--radius-md)',
-                      background: `${pc.dot}18`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      <Icon path={rec.icon} size={18} />
+                  <div key={rec.id} style={{ display: 'flex', gap: '10px', padding: '12px', borderRadius: 'var(--radius-md)', background: pc.bg, border: `1px solid ${pc.border}`, transition: 'all var(--transition-fast)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 'var(--radius-sm)', background: `${pc.dot}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: pc.dot }}>
+                      {typeof rec.icon === 'string' ? <Icon path={rec.icon} size={15} /> : rec.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {rec.title}
-                        </span>
-                        <Badge color={pc.badge} style={{ fontSize: '0.65rem', padding: '2px 7px' }}>{pc.label}</Badge>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>{rec.title}</span>
+                        <Badge color={pc.badge} style={{ fontSize: '0.6rem', padding: '1px 5px' }}>{pc.label}</Badge>
                       </div>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 }}>
-                        {rec.text}
-                      </p>
+                      <p style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: 0 }}>{rec.text}</p>
                     </div>
                   </div>
                 );
@@ -718,134 +520,159 @@ export default function AIInsights() {
         </Card>
       </div>
 
-      {/* Spending Trends & Investment Performance */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px', marginTop: '20px' }}>
-        {/* Monthly Spending Trends */}
-        {computed.expenseByCategory && Object.keys(computed.expenseByCategory).length > 0 && (
-          <Card>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--warning-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon path={icons.activity} size={18} />
-              </div>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Spending Distribution</h2>
+      {/* ML Predictions (when available) */}
+      {mlAvailable && mlInsights && (
+        <Card style={{ marginBottom: '16px', border: '1px solid rgba(139,92,246,0.2)', background: 'linear-gradient(135deg, rgba(139,92,246,0.05), rgba(59,130,246,0.05))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FiCpu size={16} style={{ color: '#A78BFA' }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {Object.entries(computed.expenseByCategory)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 6)
-                .map(([cat, amount], i) => {
-                  const pct = computed.totalExpenses > 0 ? (amount / computed.totalExpenses) * 100 : 0;
-                  const colors = ['#3B82F6', '#EF4444', '#8B5CF6', '#F59E0B', '#14B8A6', '#EC4899'];
-                  return (
-                    <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: colors[i % colors.length], flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-primary)', width: 90, fontWeight: 500 }}>{cat}</span>
-                      <div style={{ flex: 1, height: 8, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: 999, width: `${pct}%`, background: colors[i % colors.length], transition: 'width 0.8s ease' }} />
-                      </div>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', minWidth: 60, textAlign: 'right' }}>{fmt(amount)}</span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', minWidth: 35, textAlign: 'right' }}>{pct.toFixed(0)}%</span>
-                    </div>
-                  );
-                })}
+            <div>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>ML Predictions</h2>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Powered by Flask ML service &bull; {mlInsights.dataPoints || 0} data points</span>
             </div>
-          </Card>
-        )}
-
-        {/* Investment Performance Summary */}
-        {computed.investments && computed.investments.length > 0 && (() => {
-          const activeInvs = computed.investments.filter(inv => inv.status === 'active');
-          const totalInv = activeInvs.reduce((s, inv) => s + (inv.amount || 0), 0);
-          const totalCurr = activeInvs.reduce((s, inv) => s + (inv.currentValue != null ? inv.currentValue : (inv.amount || 0)), 0);
-          const totalRet = totalInv > 0 ? ((totalCurr - totalInv) / totalInv) * 100 : 0;
-          const types = [...new Set(activeInvs.map(inv => inv.type))];
-          const bestInv = activeInvs.reduce((best, inv) => {
-            const ret = inv.amount > 0 ? ((inv.currentValue - inv.amount) / inv.amount) * 100 : 0;
-            const bestRet = best.amount > 0 ? ((best.currentValue - best.amount) / best.amount) * 100 : -Infinity;
-            return ret > bestRet ? inv : best;
-          }, activeInvs[0] || {});
-          return (
-            <Card>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon path={icons.investments} size={18} />
-                </div>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Investment Performance</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+            {[
+              { label: 'Predicted Savings', value: fmt(mlPredictions?.predictedSavingsNextMonth || 0), color: (mlPredictions?.predictedSavingsNextMonth || 0) >= 0 ? 'var(--success-light)' : 'var(--danger-light)', sub: mlPredictions?.savingsTrend ? `Trend: ${mlPredictions.savingsTrend}` : null },
+              { label: 'Predicted Expenses', value: fmt(mlPredictions?.predictedExpensesNextMonth || 0), color: 'var(--danger-light)', sub: mlPredictions?.expenseTrend ? `Trend: ${mlPredictions.expenseTrend}` : null },
+              { label: 'Health Score', value: `${mlInsights.financialHealth?.score || 0}/100`, color: (mlInsights.financialHealth?.score || 0) >= 80 ? 'var(--success-light)' : (mlInsights.financialHealth?.score || 0) >= 60 ? 'var(--accent-light)' : 'var(--warning-light)', sub: mlInsights.financialHealth?.status || null },
+              { label: 'Income Trend', value: mlPredictions?.incomeTrend || 'stable', color: mlPredictions?.incomeTrend === 'increasing' ? 'var(--success-light)' : mlPredictions?.incomeTrend === 'decreasing' ? 'var(--danger-light)' : 'var(--text-muted)', sub: mlPredictions?.incomeTrendPercent ? `${mlPredictions.incomeTrendPercent > 0 ? '+' : ''}${mlPredictions.incomeTrendPercent}%` : null },
+            ].map((item, i) => (
+              <div key={i} style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: item.color }}>{item.value}</div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '3px' }}>{item.label}</div>
+                {item.sub && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.sub}</div>}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                {[
-                  { label: 'Total Invested', value: fmt(totalInv), color: 'var(--accent-light)' },
-                  { label: 'Current Value', value: fmt(totalCurr), color: totalCurr >= totalInv ? 'var(--success-light)' : 'var(--danger-light)' },
-                  { label: 'Overall Return', value: `${totalRet >= 0 ? '+' : ''}${totalRet.toFixed(1)}%`, color: totalRet >= 0 ? 'var(--success)' : 'var(--danger)' },
-                  { label: 'Asset Classes', value: types.length, color: 'var(--purple-light)' },
-                ].map((item, i) => (
-                  <div key={i} style={{ padding: '10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1rem', fontWeight: 800, color: item.color }}>{item.value}</div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{item.label}</div>
+            ))}
+          </div>
+          {mlInsights.recommendations && mlInsights.recommendations.length > 0 && (
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>ML Recommendations</div>
+              {mlInsights.recommendations.slice(0, 3).map((rec, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: 'var(--radius-md)', marginBottom: '6px', background: rec.priority === 'high' ? 'rgba(239,68,68,0.06)' : rec.priority === 'low' ? 'rgba(16,185,129,0.06)' : 'var(--bg-glass)', border: `1px solid ${rec.priority === 'high' ? 'rgba(239,68,68,0.15)' : rec.priority === 'low' ? 'rgba(16,185,129,0.15)' : 'var(--border-light)'}` }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{rec.title}</span>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: '2px 0 0', lineHeight: 1.4 }}>{rec.message}</p>
                   </div>
-                ))}
-              </div>
-              {bestInv && bestInv.name && (
-                <div style={{ padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--success-light)', marginBottom: '4px' }}>Best Performer</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{bestInv.name}</div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{bestInv.type} - {bestInv.category}</div>
                 </div>
-              )}
-            </Card>
-          );
-        })()}
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Charts Row: 6-Month Trend + Expense Breakdown */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FiActivity size={16} />
+            </div>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>6-Month Income vs Expenses</h2>
+          </div>
+          <div style={{ height: 260 }}><Line data={monthlyTrendData} options={monthlyTrendOptions} /></div>
+        </Card>
+
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FiPieChart size={16} />
+            </div>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Expense Breakdown</h2>
+          </div>
+          <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Doughnut data={doughnutData} options={doughnutOptions} />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px', justifyContent: 'center' }}>
+            {catLabels.slice(0, 5).map((cat, i) => (
+              <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: catColors[i % catColors.length] }} />
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{cat}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
+
+      {/* Investment Performance */}
+      {computed.investments && computed.investments.length > 0 && (() => {
+        const activeInvs = computed.investments.filter(inv => inv.status === 'active');
+        const totalInv = activeInvs.reduce((s, inv) => s + (inv.amount || 0), 0);
+        const totalCurr = activeInvs.reduce((s, inv) => s + (inv.currentValue != null ? inv.currentValue : (inv.amount || 0)), 0);
+        const totalRet = totalInv > 0 ? ((totalCurr - totalInv) / totalInv) * 100 : 0;
+        const types = [...new Set(activeInvs.map(inv => inv.type))];
+        const bestInv = activeInvs.reduce((best, inv) => {
+          const ret = inv.amount > 0 ? ((inv.currentValue - inv.amount) / inv.amount) * 100 : 0;
+          const bestRet = best?.amount > 0 ? ((best.currentValue - best.amount) / best.amount) * 100 : -Infinity;
+          return ret > bestRet ? inv : best;
+        }, activeInvs[0]);
+        return (
+          <Card style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--purple-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FiBriefcase size={16} />
+              </div>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Investment Performance</h2>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+              {[
+                { label: 'Invested', value: fmt(totalInv), color: 'var(--accent-light)' },
+                { label: 'Current Value', value: fmt(totalCurr), color: totalCurr >= totalInv ? 'var(--success-light)' : 'var(--danger-light)' },
+                { label: 'Return', value: `${totalRet >= 0 ? '+' : ''}${totalRet.toFixed(1)}%`, color: totalRet >= 0 ? 'var(--success)' : 'var(--danger)' },
+                { label: 'Asset Classes', value: types.length, color: 'var(--purple-light)' },
+              ].map((item, i) => (
+                <div key={i} style={{ padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: item.color }}>{item.value}</div>
+                  <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+            {bestInv && bestInv.name && (
+              <div style={{ padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', border: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <FiTrendingUp size={16} style={{ color: 'var(--success-light)', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success-light)' }}>Best Performer</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{bestInv.name}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{bestInv.type} &bull; {bestInv.category}</div>
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })()}
 
       {/* Financial Health Score */}
       {health && (() => {
         const fh = health;
         const fhColor = fh.status === 'Excellent' ? 'var(--success)' : fh.status === 'Good' ? 'var(--accent)' : fh.status === 'Fair' ? 'var(--warning)' : 'var(--danger)';
-        const fhLight = fh.status === 'Excellent' ? 'var(--success-light)' : fh.status === 'Good' ? 'var(--accent-light)' : fh.status === 'Fair' ? 'var(--warning-light)' : 'var(--danger-light)';
         const fhBadge = fh.status === 'Excellent' ? 'success' : fh.status === 'Good' ? 'info' : fh.status === 'Fair' ? 'warning' : 'danger';
-        const lastUpdated = fh.lastUpdated ? new Date(fh.lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today';
-
         return (
-          <Card style={{ marginTop: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 'var(--radius-md)',
-                background: 'var(--success-glow)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon path={icons.shield} size={18} />
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FiShield size={16} />
               </div>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Financial Health Score
-              </h2>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Financial Health Score</h2>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' }}>
-              {/* Gauge */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <SemiCircleGauge score={fh.score} size={280} color={fhColor} />
+                <SemiCircleGauge score={fh.score} size={240} color={fhColor} />
                 <div style={{ textAlign: 'center', marginTop: '-8px' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: fhLight }}>{fh.score}/100</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: fhColor }}>{fh.score}/100</div>
                   <Badge color={fhBadge} dot style={{ marginTop: '6px' }}>{fh.status}</Badge>
                 </div>
               </div>
-
-              {/* Details */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[
                   { label: 'Savings Rate', value: `${fh.savingsRate}%`, color: 'var(--accent-light)' },
                   { label: 'Total Income', value: fmt(fh.totalIncome), color: 'var(--success-light)' },
                   { label: 'Total Expenses', value: fmt(fh.totalExpenses), color: 'var(--danger-light)' },
                   { label: 'Total Savings', value: fmt(fh.totalSavings), color: fh.totalSavings >= 0 ? 'var(--success-light)' : 'var(--danger-light)' },
-                  { label: 'Last Updated', value: lastUpdated, color: 'var(--text-secondary)' },
                 ].map((row, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 14px', borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-glass)', border: '1px solid var(--border-light)',
-                  }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{row.label}</span>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: row.color }}>{row.value}</span>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{row.label}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, color: row.color }}>{row.value}</span>
                   </div>
                 ))}
               </div>

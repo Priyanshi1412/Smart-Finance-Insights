@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+﻿import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI, incomeAPI, expenseAPI, investmentAPI, portfolioAPI, goalAPI, analyticsAPI, notificationAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -684,66 +684,66 @@ export default function Dashboard() {
 
       {/* ===== Milestone 3: Intelligence & Insights Sections ===== */}
 
-      {/* Budget Recommendations */}
-      <div style={{ marginBottom: '20px' }}>
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon path={icons.send} size={18} />
+      {/* ===== Budget Recommendations + Financial Health Score — Side by Side ===== */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+
+        {/* Budget Recommendations — Compact Widget */}
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon path={icons.send} size={17} />
             </div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Budget Recommendations</h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Budget Recommendations</h2>
           </div>
           {budgetRecommendations ? (
             <>
               {budgetRecommendations.overspendingAlerts.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--danger-light)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon path={icons.alertCircle} size={14} /> Overspending Alerts
-                  </div>
-                  {budgetRecommendations.overspendingAlerts.map((alert, i) => (
-                    <div key={i} style={{ padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--danger-glow)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', background: 'rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--danger-light)' }}>
-                          <FiAlertOctagon size={15} />
-                        </div>
-                        <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{alert.category}</span>
-                          <Badge color="danger">Exceeded by {fmt(alert.overBy)}</Badge>
-                        </div>
+                <div style={{ marginBottom: '10px' }}>
+                  {budgetRecommendations.overspendingAlerts.slice(0, 2).map((alert, i) => (
+                    <div key={i} style={{ padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--danger-glow)', border: '1px solid rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: i === 0 ? '6px' : 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 'var(--radius-sm)', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FiAlertOctagon size={13} style={{ color: 'var(--danger-light)' }} />
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', marginLeft: '42px' }}>Spent {fmt(alert.spent)} of {fmt(alert.limit)} ({alert.percentage}%)</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{alert.category}</span>
+                          <Badge color="danger" style={{ fontSize: '0.65rem', padding: '2px 7px' }}>+{fmt(alert.overBy)}</Badge>
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '1px' }}>{alert.percentage}% of budget used</div>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
               {budgetRecommendations.recommendations.length > 0 && (
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-light)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon path={icons.send} size={14} /> Suggestions
-                  </div>
-                  {budgetRecommendations.recommendations.slice(0, 5).map((rec, i) => {
+                  {budgetRecommendations.recommendations.slice(0, 2).map((rec, i) => {
                     const typeIconMap = {
-                      reduce: <FiTrendingDown size={14} />,
-                      increase_savings: <FiDollarSign size={14} />,
-                      monitor: <FiEye size={14} />,
-                      reduce_discretionary: <FiAlertTriangle size={14} />,
-                      trend_warning: <FiTrendingUp size={14} />,
-                      emergency_fund: <FiShield size={14} />,
-                      optimize: <FiSettings size={14} />,
-                      create: <FiPlusCircle size={14} />,
-                      good: <FiCheckCircle size={14} />,
+                      reduce: <FiTrendingDown size={13} />,
+                      increase_savings: <FiDollarSign size={13} />,
+                      monitor: <FiEye size={13} />,
+                      reduce_discretionary: <FiAlertTriangle size={13} />,
+                      trend_warning: <FiTrendingUp size={13} />,
+                      emergency_fund: <FiShield size={13} />,
+                      optimize: <FiSettings size={13} />,
+                      create: <FiPlusCircle size={13} />,
+                      good: <FiCheckCircle size={13} />,
                     };
-                    const recIcon = typeIconMap[rec.type] || <FiZap size={14} />;
+                    const recIcon = typeIconMap[rec.type] || <FiZap size={13} />;
+                    const prioColor = rec.priority === 'high' ? 'var(--danger-light)' : rec.priority === 'medium' ? 'var(--warning-light)' : 'var(--success-light)';
+                    const prioBg = rec.priority === 'high' ? 'var(--danger-glow)' : rec.priority === 'medium' ? 'var(--warning-glow)' : 'rgba(16,185,129,0.1)';
                     return (
-                    <div key={i} style={{ display: 'flex', gap: '10px', padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', marginBottom: '8px' }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 'var(--radius-sm)', background: rec.priority === 'high' ? 'var(--danger-glow)' : rec.priority === 'medium' ? 'var(--warning-glow)' : 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: rec.priority === 'high' ? 'var(--danger-light)' : rec.priority === 'medium' ? 'var(--warning-light)' : 'var(--success-light)' }}>
+                    <div key={i} style={{ display: 'flex', gap: '10px', padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', marginBottom: i === 0 ? '6px' : 0, transition: 'background var(--transition-fast)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-glow)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-glass)'; }}
+                    >
+                      <div style={{ width: 26, height: 26, borderRadius: 'var(--radius-sm)', background: prioBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: prioColor }}>
                         {recIcon}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        {rec.title && <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>{rec.title}</div>}
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{rec.message}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>{rec.title || rec.message}</div>
                         {rec.suggestedBudget && (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--accent-light)', marginTop: '4px' }}>Suggested: {fmt(rec.suggestedBudget)}/month</div>
+                          <div style={{ fontSize: '0.66rem', color: 'var(--accent-light)', marginTop: '2px' }}>Suggested: {fmt(rec.suggestedBudget)}/mo</div>
                         )}
                       </div>
                     </div>
@@ -752,124 +752,76 @@ export default function Dashboard() {
                 </div>
               )}
               {budgetRecommendations.recommendations.length === 0 && budgetRecommendations.overspendingAlerts.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-                  <Icon path={icons.check} size={32} />
-                  <p style={{ marginTop: '12px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Your budgets look good! No alerts or recommendations.</p>
+                <div style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-muted)', fontSize: '0.85rem', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon path={icons.check} size={26} />
+                  <div style={{ marginTop: '8px' }}>Your budgets look good!</div>
                 </div>
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Set budgets to get personalized recommendations</div>
+            <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '0.85rem', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Set budgets to get recommendations</div>
           )}
         </Card>
-      </div>
 
-      {/* Financial Health Score */}
-      <div style={{ marginBottom: '20px' }}>
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon path={icons.shield} size={18} />
+        {/* Financial Health Score — Compact Widget */}
+        <Card style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-md)', background: 'var(--success-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon path={icons.shield} size={17} />
             </div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Financial Health Score</h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Financial Health Score</h2>
           </div>
           {financialHealthData ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
-                <div style={{ position: 'relative', width: 110, height: 110 }}>
-                  <svg width={110} height={110} style={{ transform: 'rotate(-90deg)' }}>
-                    <circle cx={55} cy={55} r={46} fill="none" stroke="var(--border)" strokeWidth={9} />
-                    <circle cx={55} cy={55} r={46} fill="none"
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '14px' }}>
+                <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                  <svg width={80} height={80} style={{ transform: 'rotate(-90deg)' }}>
+                    <circle cx={40} cy={40} r={33} fill="none" stroke="var(--border)" strokeWidth={7} />
+                    <circle cx={40} cy={40} r={33} fill="none"
                       stroke={financialHealthData.score >= 80 ? 'var(--success)' : financialHealthData.score >= 60 ? 'var(--accent)' : financialHealthData.score >= 40 ? 'var(--warning)' : 'var(--danger)'}
-                      strokeWidth={9} strokeDasharray={2 * Math.PI * 46}
-                      strokeDashoffset={2 * Math.PI * 46 * (1 - Math.min(financialHealthData.score, 100) / 100)}
+                      strokeWidth={7} strokeDasharray={2 * Math.PI * 33}
+                      strokeDashoffset={2 * Math.PI * 33 * (1 - Math.min(financialHealthData.score, 100) / 100)}
                       strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
                   </svg>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>{financialHealthData.score}</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>/100</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)' }}>{financialHealthData.score}</div>
+                    <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>/100</div>
                   </div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <Badge color={financialHealthData.status === 'Excellent' ? 'success' : financialHealthData.status === 'Good' ? 'info' : financialHealthData.status === 'Fair' ? 'warning' : 'danger'} dot>{financialHealthData.status}</Badge>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '6px' }}>Overall Health</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.4 }}>
-                    {financialHealthData.status === 'Excellent' ? 'Your finances are in great shape. Keep maintaining these habits!' :
-                     financialHealthData.status === 'Good' ? 'Solid financial foundation. A few tweaks could make it excellent.' :
-                     financialHealthData.status === 'Fair' ? 'Some areas need attention. Focus on the suggestions below.' :
-                     'Your finances need urgent attention. Review the insights below.'}
+                  <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
+                    {financialHealthData.status === 'Excellent' ? 'Your finances are in great shape.' :
+                     financialHealthData.status === 'Good' ? 'Solid foundation — a few tweaks could make it excellent.' :
+                     financialHealthData.status === 'Fair' ? 'Some areas need attention.' :
+                     'Your finances need urgent attention.'}
                   </div>
                 </div>
               </div>
 
-              {/* Score Breakdown */}
-              {financialHealthData.scoreBreakdown && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '10px' }}>Score Breakdown</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {[
-                      { key: 'savingsRate', label: 'Savings Rate', icon: icons.piggyBank },
-                      { key: 'investments', label: 'Investments', icon: icons.trendingUp },
-                      { key: 'expenses', label: 'Expenses', icon: icons.expenses },
-                      { key: 'debt', label: 'Debt Level', icon: icons.wallet },
-                      { key: 'goals', label: 'Goal Progress', icon: icons.target },
-                    ].map(({ key, label, icon }) => {
-                      const item = financialHealthData.scoreBreakdown[key];
-                      if (!item) return null;
-                      const pct = item.max > 0 ? (item.score / item.max) * 100 : 0;
-                      return (
-                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: 24, height: 24, borderRadius: 'var(--radius-sm)', background: 'var(--bg-glass)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Icon path={icon} size={12} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</span>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{item.score}/{item.max}</span>
-                            </div>
-                            <div style={{ height: 5, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)', transition: 'width 0.6s ease' }} />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Key Indicators */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
-                {[
-                  { label: 'Savings Ratio', value: `${financialHealthData.indicators.savingsRate}%`, color: financialHealthData.indicators.savingsRate >= 20 ? 'var(--success)' : 'var(--warning)' },
-                  { label: 'Expense Ratio', value: `${financialHealthData.indicators.expenseRatio}%`, color: financialHealthData.indicators.expenseRatio < 70 ? 'var(--success)' : 'var(--danger)' },
-                  { label: 'Investment Growth', value: `${financialHealthData.indicators.investmentGrowth}%`, color: financialHealthData.indicators.investmentGrowth >= 0 ? 'var(--success)' : 'var(--danger)' },
-                  { label: 'Budget Used', value: `${financialHealthData.indicators.avgBudgetUtilization || 0}%`, color: (financialHealthData.indicators.avgBudgetUtilization || 0) <= 80 ? 'var(--success)' : (financialHealthData.indicators.avgBudgetUtilization || 0) <= 100 ? 'var(--warning)' : 'var(--danger)' },
-                ].map((item, i) => (
-                  <div key={i} style={{ padding: '10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1rem', fontWeight: 800, color: item.color }}>{item.value}</div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>{item.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Insights */}
-              {financialHealthData.insights.length > 0 && (
-                <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Recommendations</div>
-                  {financialHealthData.insights.slice(0, 3).map((insight, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px', padding: '8px 10px', borderRadius: 'var(--radius-sm)', background: insight.type === 'critical' ? 'var(--danger-glow)' : insight.type === 'good' ? 'rgba(16,185,129,0.1)' : 'var(--warning-glow)' }}>
-                      <Icon path={insight.type === 'critical' ? icons.alertCircle : insight.type === 'good' ? icons.check : icons.alertCircle} size={14} />
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{insight.text}</span>
+              {/* Compact mini metrics */}
+              {financialHealthData.indicators && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: 'auto' }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: financialHealthData.indicators.savingsRate >= 20 ? 'var(--success)' : 'var(--warning)' }}>
+                      {financialHealthData.indicators.savingsRate}%
                     </div>
-                  ))}
+                    <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>Savings Rate</div>
+                  </div>
+                  <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: financialHealthData.indicators.expenseRatio < 70 ? 'var(--success)' : 'var(--danger)' }}>
+                      {financialHealthData.indicators.expenseRatio}%
+                    </div>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '2px' }}>Expense Ratio</div>
+                  </div>
                 </div>
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Add financial data to see your health score</div>
+            <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--text-muted)', fontSize: '0.85rem', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Add financial data to see your health score</div>
           )}
         </Card>
+
       </div>
     </Layout>
   );

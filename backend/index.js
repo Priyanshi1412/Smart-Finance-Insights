@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config();
+const mlService = require('./services/mlService');
 
 const app = express();
 
@@ -52,10 +53,10 @@ app.use('/api/login', authLimiter);
 
 // Validate JWT secret
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/smart_finance';
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  console.warn('WARNING: JWT_SECRET is not set or is too short. Using a default. Set a strong JWT_SECRET in production!');
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: JWT_SECRET is not set. Using a persistent dev secret. Set a strong JWT_SECRET in production!');
 }
-const JWT_SECRET = process.env.JWT_SECRET || ('dev-secret-' + require('crypto').randomBytes(32).toString('hex'));
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-smartfinance-persistent-key-2024';
 
 // Input validation helpers
 const { ObjectId } = mongoose.Types;
@@ -113,6 +114,10 @@ async function startServer() {
       name: { type: String, required: true },
       email: { type: String, required: true, unique: true },
       password: { type: String, required: true },
+      profilePicture: { type: String, default: '' },
+      currency: { type: String, default: 'INR' },
+      passwordChangedAt: { type: Date, default: null },
+      lastLoginAt: { type: Date, default: null },
       createdAt: { type: Date, default: Date.now }
     });
 
@@ -123,6 +128,7 @@ async function startServer() {
       date: { type: Date, default: Date.now },
       description: { type: String }
     });
+    incomeSchema.index({ userId: 1, date: -1 });
 
     const expenseSchema = new mongoose.Schema({
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -131,6 +137,7 @@ async function startServer() {
       date: { type: Date, default: Date.now },
       description: { type: String }
     });
+    expenseSchema.index({ userId: 1, date: -1 });
 
     const budgetSchema = new mongoose.Schema({
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -138,6 +145,7 @@ async function startServer() {
       limit: { type: Number, required: true },
       month: { type: String, required: true }
     });
+    budgetSchema.index({ userId: 1, month: 1 });
 
     const goalSchema = new mongoose.Schema({
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -153,6 +161,7 @@ async function startServer() {
       createdAt: { type: Date, default: Date.now },
       updatedAt: { type: Date, default: Date.now }
     });
+    goalSchema.index({ userId: 1, status: 1 });
 
     const investmentSchema = new mongoose.Schema({
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -168,6 +177,7 @@ async function startServer() {
       createdAt: { type: Date, default: Date.now },
       updatedAt: { type: Date, default: Date.now }
     });
+    investmentSchema.index({ userId: 1, status: 1 });
 
     const notificationSchema = new mongoose.Schema({
       userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -180,6 +190,7 @@ async function startServer() {
       amount: { type: Number },
       createdAt: { type: Date, default: Date.now }
     });
+    notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 
     const User = mongoose.model('User', userSchema);
     const Income = mongoose.model('Income', incomeSchema);
@@ -259,8 +270,21 @@ async function startServer() {
         if (!user) return res.status(401).json({ error: 'Invalid credentials' });
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+        user.lastLoginAt = new Date();
+        await user.save();
         const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '2h' });
-        res.json({ token, user: { name: user.name, email: user.email } });
+        res.json({
+          token,
+          user: {
+            name: user.name,
+            email: user.email,
+            profilePicture: user.profilePicture || '',
+            currency: user.currency || 'INR',
+            createdAt: user.createdAt,
+            lastLoginAt: user.lastLoginAt,
+            passwordChangedAt: user.passwordChangedAt,
+          }
+        });
       } catch (err) {
         console.error('[LOGIN] Error:', err.message);
         res.status(500).json({ error: 'Server error' });
@@ -1310,7 +1334,8 @@ async function startServer() {
 
         // --- 5. EMERGENCY FUND CHECK ---
         const emergencyFund = goals.find(g => g.category === 'Emergency Fund');
-        const monthlyExpenses = totalCurMonth > 0 ? totalCurMonth : (totalExpenses / Math.max(1, Object.keys(categoryTotals[cat]?.monthly || {}).length || 1));
+        const monthsOfData = Math.max(1, Object.keys(categoryTotals).reduce((max, c) => Math.max(max, Object.keys(categoryTotals[c]?.monthly || {}).length), 0) || 1);
+        const monthlyExpenses = totalCurMonth > 0 ? totalCurMonth : (totalExpenses / monthsOfData);
         if (!emergencyFund) {
           const targetAmount = Math.round(monthlyExpenses * 6);
           addRec('emergency_fund', 'high', null,
@@ -1754,12 +1779,10 @@ async function startServer() {
           }
         });
 
-        const existingTypes = newNotifications.map(n => n.type);
-        const uniqueNew = newNotifications.filter(n => {
-          if (n.type === 'budget_exceeded' || n.type === 'budget_warning' || n.type === 'unusual_spending' || n.type === 'goal_deadline_urgent') {
-            return !existingTypes.includes(n.type + '_' + n.category);
-          }
-          return true;
+        const existingTypes = newNotifications.map(n => `${n.type}_${n.category || ''}`);
+        const uniqueNew = newNotifications.filter((n, i) => {
+          const key = `${n.type}_${n.category || ''}`;
+          return existingTypes.indexOf(key) === i;
         });
 
         let created = [];
@@ -1792,6 +1815,107 @@ async function startServer() {
       }
     });
 
+    // ===== User Profile & Settings Endpoints =====
+
+    app.get('/api/user/account-info', auth, async (req, res) => {
+      try {
+        const user = await User.findById(req.userId).select('-password');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({
+          name: user.name,
+          email: user.email,
+          profilePicture: user.profilePicture || '',
+          currency: user.currency || 'INR',
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt,
+          passwordChangedAt: user.passwordChangedAt,
+        });
+      } catch (err) {
+        console.error('[ACCOUNT INFO] Error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+
+    app.put('/api/user/profile', auth, async (req, res) => {
+      try {
+        const { name, profilePicture } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        if (name !== undefined) {
+          const sanitizedName = sanitizeString(name, 100);
+          if (!sanitizedName || sanitizedName.length < 2) return res.status(400).json({ error: 'Name must be at least 2 characters' });
+          user.name = sanitizedName;
+        }
+        if (profilePicture !== undefined) {
+          if (profilePicture && !profilePicture.startsWith('data:image/')) {
+            return res.status(400).json({ error: 'Invalid image format' });
+          }
+          if (profilePicture && profilePicture.length > 5 * 1024 * 1024) {
+            return res.status(400).json({ error: 'Image size must be less than 5MB' });
+          }
+          user.profilePicture = profilePicture;
+        }
+        await user.save();
+        res.json({
+          name: user.name,
+          email: user.email,
+          profilePicture: user.profilePicture || '',
+          currency: user.currency || 'INR',
+        });
+      } catch (err) {
+        console.error('[UPDATE PROFILE] Error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+
+    app.delete('/api/user/profile-picture', auth, async (req, res) => {
+      try {
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        user.profilePicture = '';
+        await user.save();
+        res.json({ success: true });
+      } catch (err) {
+        console.error('[REMOVE PROFILE PICTURE] Error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+
+    app.put('/api/user/password', auth, async (req, res) => {
+      try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current and new password are required' });
+        if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        const valid = await bcrypt.compare(currentPassword, user.password);
+        if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+        user.password = await bcrypt.hash(newPassword, 12);
+        user.passwordChangedAt = new Date();
+        await user.save();
+        res.json({ success: true, message: 'Password updated successfully' });
+      } catch (err) {
+        console.error('[CHANGE PASSWORD] Error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+
+    app.put('/api/user/currency', auth, async (req, res) => {
+      try {
+        const { currency } = req.body;
+        const validCurrencies = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD'];
+        if (!validCurrencies.includes(currency)) return res.status(400).json({ error: 'Invalid currency' });
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        user.currency = currency;
+        await user.save();
+        res.json({ success: true, currency: user.currency });
+      } catch (err) {
+        console.error('[UPDATE CURRENCY] Error:', err.message);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+
     app.delete('/api/clear-data', auth, async (req, res) => {
       try {
         console.log(`[CLEAR DATA] User ${req.userId} clearing their data`);
@@ -1809,6 +1933,68 @@ async function startServer() {
       } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
+      }
+    });
+
+    // ─── ML Service Routes ─────────────────────────────────────────────
+    app.get('/api/ml/health', auth, async (req, res) => {
+      try {
+        const healthy = await mlService.checkHealth();
+        res.json({ mlServiceAvailable: healthy });
+      } catch (err) {
+        res.json({ mlServiceAvailable: false });
+      }
+    });
+
+    app.get('/api/ml/financial-insights', auth, async (req, res) => {
+      try {
+        const result = await mlService.getFinancialInsights(
+          req.userId, Income, Expense, Budget, Goal, Investment
+        );
+        if (result.ok) {
+          res.json(result.data);
+        } else {
+          res.status(503).json({ error: result.error, fallback: true });
+        }
+      } catch (err) {
+        console.error('[ML ROUTE] financial-insights error:', err.message);
+        res.status(500).json({ error: 'ML service error', fallback: true });
+      }
+    });
+
+    app.get('/api/ml/predictions', auth, async (req, res) => {
+      try {
+        const result = await mlService.getPredictions(req.userId, Income, Expense);
+        if (result.ok) {
+          res.json(result.data);
+        } else {
+          res.status(503).json({ error: result.error, fallback: true });
+        }
+      } catch (err) {
+        console.error('[ML ROUTE] predictions error:', err.message);
+        res.status(500).json({ error: 'ML service error', fallback: true });
+      }
+    });
+
+    app.post('/api/ml/analyze', auth, async (req, res) => {
+      try {
+        const [incomes, expenses, budgets, goals, investments] = await Promise.all([
+          Income.find({ userId: req.userId }).sort({ date: -1 }).limit(120).lean(),
+          Expense.find({ userId: req.userId }).sort({ date: -1 }).limit(120).lean(),
+          Budget.find({ userId: req.userId }).lean(),
+          Goal.find({ userId: req.userId }).lean(),
+          Investment.find({ userId: req.userId }).lean(),
+        ]);
+        const monthlyData = mlService.buildMonthlyData(incomes, expenses, goals, investments);
+        const result = await require('../services/mlService').callML('/analyze', { monthly: monthlyData });
+        if (result.ok) {
+          res.json(result.data);
+        } else {
+          res.status(503).json({ error: result.error, fallback: true });
+        }
+      } catch (err) {
+        console.error('[ML ROUTE] analyze error:', err.message);
+        res.status(500).json({ error: 'ML service error', fallback: true });
       }
     });
 

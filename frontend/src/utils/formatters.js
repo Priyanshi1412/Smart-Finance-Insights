@@ -1,16 +1,38 @@
-const currencyFormatter = new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-});
+const CURRENCY_MAP = {
+  INR: { locale: 'en-IN', code: 'INR' },
+  USD: { locale: 'en-US', code: 'USD' },
+  EUR: { locale: 'de-DE', code: 'EUR' },
+  GBP: { locale: 'en-GB', code: 'GBP' },
+  JPY: { locale: 'ja-JP', code: 'JPY' },
+  AUD: { locale: 'en-AU', code: 'AUD' },
+  CAD: { locale: 'en-CA', code: 'CAD' },
+};
 
-export function fmt(value) {
-  return currencyFormatter.format(value || 0);
+function getFormatter(currency) {
+  const config = CURRENCY_MAP[currency] || CURRENCY_MAP.INR;
+  return new Intl.NumberFormat(config.locale, {
+    style: 'currency',
+    currency: config.code,
+    maximumFractionDigits: 0,
+  });
+}
+
+const defaultFormatter = getFormatter('INR');
+
+export function fmt(value, currency) {
+  const num = Number(value);
+  if (isNaN(num) || !isFinite(num)) return '₹0';
+  if (currency && CURRENCY_MAP[currency]) {
+    return getFormatter(currency).format(num);
+  }
+  return defaultFormatter.format(num);
 }
 
 export function fmtDate(dateStr) {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('en-IN', {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -19,7 +41,9 @@ export function fmtDate(dateStr) {
 
 export function fmtDateShort(dateStr) {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('en-IN', {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', {
     month: 'short',
     day: 'numeric',
   });

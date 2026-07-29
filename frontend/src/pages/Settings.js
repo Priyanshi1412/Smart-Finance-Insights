@@ -1,15 +1,51 @@
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Icon, { icons } from '../components/Icon';
-import { incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, settingsAPI } from '../services/api';
-import { useState } from 'react';
+import { incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, settingsAPI, userAPI } from '../services/api';
+import { useState, useEffect } from 'react';
 
 const fadeInUp = { animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 };
 const stagger = (i) => ({ animationDelay: `${i * 0.08}s` });
+
+const currencyOptions = [
+  { code: 'INR', label: 'Indian Rupee', symbol: '₹' },
+  { code: 'USD', label: 'US Dollar', symbol: '$' },
+  { code: 'EUR', label: 'Euro', symbol: '€' },
+  { code: 'GBP', label: 'British Pound', symbol: '£' },
+  { code: 'JPY', label: 'Japanese Yen', symbol: '¥' },
+  { code: 'AUD', label: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CAD', label: 'Canadian Dollar', symbol: 'C$' },
+];
+
+function Modal({ open, onClose, children }) {
+  if (!open) return null;
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        animation: 'modalFadeIn 0.2s ease-out',
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background: 'var(--bg-card)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)', padding: 0,
+        maxWidth: '420px', width: '92%',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        animation: 'modalSlideIn 0.25s ease-out',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function toCSV(rows, headers) {
   if (!rows.length) return '';
@@ -39,9 +75,74 @@ function downloadCSV(filename, csv) {
 export default function Settings() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
+  const { currency, setCurrency } = useCurrency();
   const [exporting, setExporting] = useState(false);
   const [clearing, setClearing] = useState(false);
+
+  const [pwOpen, setPwOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState({ type: '', text: '' });
+
+  const [curOpen, setCurOpen] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState(currency);
+  const [curLoading, setCurLoading] = useState(false);
+  const [curMsg, setCurMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => { setSelectedCurrency(currency); }, [currency]);
+
+  const resetPw = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPw(false);
+    setPwMsg({ type: '', text: '' });
+  };
+
+  const handlePwSubmit = async (e) => {
+    e.preventDefault();
+    setPwMsg({ type: '', text: '' });
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPwMsg({ type: 'error', text: 'All fields are required' }); return;
+    }
+    if (newPassword.length < 6) {
+      setPwMsg({ type: 'error', text: 'New password must be at least 6 characters' }); return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwMsg({ type: 'error', text: 'Passwords do not match' }); return;
+    }
+    setPwLoading(true);
+    try {
+      await userAPI.changePassword({ currentPassword, newPassword });
+      setPwMsg({ type: 'success', text: 'Password updated successfully' });
+      resetPw();
+      setTimeout(() => { setPwOpen(false); setPwMsg({ type: '', text: '' }); }, 1200);
+    } catch (err) {
+      setPwMsg({ type: 'error', text: err.response?.data?.error || 'Failed to change password' });
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleCurSave = async () => {
+    setCurLoading(true);
+    setCurMsg({ type: '', text: '' });
+    try {
+      await userAPI.updateCurrency(selectedCurrency);
+      setCurrency(selectedCurrency);
+      if (user) updateUser({ currency: selectedCurrency });
+      setCurMsg({ type: 'success', text: 'Currency updated' });
+      setTimeout(() => { setCurOpen(false); setCurMsg({ type: '', text: '' }); }, 1000);
+    } catch (err) {
+      setCurMsg({ type: 'error', text: err.response?.data?.error || 'Failed to update' });
+    } finally {
+      setCurLoading(false);
+    }
+  };
 
   const handleExport = async () => {
     setExporting(true);
@@ -149,6 +250,15 @@ export default function Settings() {
     }
   };
 
+  const currentLabel = currencyOptions.find(o => o.code === currency);
+
+  const modalInput = {
+    width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--border)', background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  };
+
   return (
     <Layout title="Settings">
       <style>{`
@@ -165,6 +275,8 @@ export default function Settings() {
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        @keyframes modalFadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes modalSlideIn { from { opacity:0; transform:translateY(12px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
         .setting-row {
           transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
           border-radius: var(--radius-md);
@@ -212,11 +324,28 @@ export default function Settings() {
           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           background-size: 200% 200%; animation: gradient-shift 3s ease infinite;
         }
+        .pw-field:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+        .pw-field::placeholder { color: var(--text-muted); opacity: 0.6; }
+        .pw-toggle {
+          position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+          background: none; border: none; cursor: pointer; color: var(--text-muted);
+          padding: 4px; display: flex; border-radius: var(--radius-sm);
+        }
+        .pw-toggle:hover { color: var(--text-primary); }
+        .cur-opt {
+          padding: 10px 8px; border-radius: var(--radius-md); border: 1.5px solid var(--border);
+          background: var(--bg-secondary); text-align: center; cursor: pointer;
+          transition: all 0.2s;
+        }
+        .cur-opt:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+        .cur-opt.active { border-color: var(--accent); background: rgba(59,130,246,0.06);
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
       `}</style>
 
       <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-        {/* Header */}
+        {/* ═══ Header ═══ */}
         <div style={{ ...fadeInUp, ...stagger(0) }}>
           <Card style={{ padding: '28px 32px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
             <div style={{
@@ -240,7 +369,7 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Appearance */}
+        {/* ═══ Appearance ═══ */}
         <div style={{ ...fadeInUp, ...stagger(1) }}>
           <Card className="section-card" style={{ padding: '24px 28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -277,7 +406,7 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Account */}
+        {/* ═══ Account ═══ */}
         <div style={{ ...fadeInUp, ...stagger(2) }}>
           <Card className="section-card" style={{ padding: '24px 28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -341,10 +470,56 @@ export default function Settings() {
                 Verified
               </div>
             </div>
+
+            <div style={{ height: 1, background: 'var(--border-light)', margin: '2px 14px' }} />
+
+            {/* Change Password row */}
+            <div className="setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div className="setting-icon" style={{
+                  width: 42, height: 42, borderRadius: 'var(--radius-md)',
+                  background: 'rgba(20,184,166,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon path={icons.shield} size={20} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>Change Password</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Update your account password securely
+                  </div>
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => { resetPw(); setPwOpen(true); }}>
+                Change
+              </Button>
+            </div>
+
+            <div style={{ height: 1, background: 'var(--border-light)', margin: '2px 14px' }} />
+
+            {/* Currency Preferences row */}
+            <div className="setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div className="setting-icon" style={{
+                  width: 42, height: 42, borderRadius: 'var(--radius-md)',
+                  background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon path={icons.creditCard} size={20} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem' }}>Currency Preferences</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Current: <span style={{ fontWeight: 600, color: 'var(--accent-light)' }}>{currentLabel?.symbol} {currency}</span> — {currentLabel?.label}
+                  </div>
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => { setSelectedCurrency(currency); setCurMsg({ type: '', text: '' }); setCurOpen(true); }}>
+                Change
+              </Button>
+            </div>
           </Card>
         </div>
 
-        {/* Data & Privacy */}
+        {/* ═══ Data & Privacy ═══ */}
         <div style={{ ...fadeInUp, ...stagger(3) }}>
           <Card className="section-card" style={{ padding: '24px 28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -455,7 +630,7 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Security */}
+        {/* ═══ Security ═══ */}
         <div style={{ ...fadeInUp, ...stagger(4) }}>
           <Card className="section-card" style={{ padding: '24px 28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
@@ -497,7 +672,7 @@ export default function Settings() {
           </Card>
         </div>
 
-        {/* Danger Zone */}
+        {/* ═══ Danger Zone ═══ */}
         <div style={{ ...fadeInUp, ...stagger(5) }}>
           <Card style={{
             padding: '24px 28px', border: '1px solid rgba(239,68,68,0.2)',
@@ -535,6 +710,171 @@ export default function Settings() {
         </div>
 
       </div>
+
+      {/* ═══ Password Modal ═══ */}
+      <Modal open={pwOpen} onClose={() => { if (!pwLoading) { resetPw(); setPwOpen(false); } }}>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--radius-md)',
+              background: 'rgba(20,184,166,0.1)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon path={icons.shield} size={17} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Change Password
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                Update your account password
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handlePwSubmit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Current Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input className="pw-field" type={showPw ? 'text' : 'password'}
+                    value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password" style={modalInput} />
+                  <button type="button" className="pw-toggle" onClick={() => setShowPw(!showPw)}>
+                    <Icon path={showPw ? icons.eyeOff : icons.eye} size={15} />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input className="pw-field" type={showPw ? 'text' : 'password'}
+                    value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 6 characters" style={modalInput} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Confirm Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input className="pw-field" type={showPw ? 'text' : 'password'}
+                    value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password" style={modalInput} />
+                </div>
+              </div>
+            </div>
+
+            {pwMsg.text && (
+              <div style={{
+                marginTop: '14px', padding: '9px 12px', borderRadius: 'var(--radius-md)',
+                fontSize: '0.78rem', fontWeight: 500,
+                background: pwMsg.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${pwMsg.type === 'success' ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}`,
+                color: pwMsg.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+              }}>
+                {pwMsg.text}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { resetPw(); setPwOpen(false); }}
+                style={{
+                  padding: '8px 18px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem',
+                  fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-secondary)',
+                }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={pwLoading}
+                style={{
+                  padding: '8px 20px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem',
+                  fontWeight: 600, cursor: pwLoading ? 'not-allowed' : 'pointer', border: 'none',
+                  background: 'var(--accent)', color: '#fff', opacity: pwLoading ? 0.6 : 1,
+                }}>
+                {pwLoading ? 'Updating...' : 'Update Password'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      {/* ═══ Currency Modal ═══ */}
+      <Modal open={curOpen} onClose={() => { if (!curLoading) setCurOpen(false); }}>
+        <div style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 'var(--radius-md)',
+              background: 'var(--accent-glow)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon path={icons.creditCard} size={17} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Change Currency
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                Choose how monetary values are displayed
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '8px' }}>
+            {currencyOptions.map((opt) => (
+              <div
+                key={opt.code}
+                className={`cur-opt ${selectedCurrency === opt.code ? 'active' : ''}`}
+                onClick={() => setSelectedCurrency(opt.code)}
+              >
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: selectedCurrency === opt.code ? 'var(--accent)' : 'var(--text-primary)', lineHeight: 1.2 }}>
+                  {opt.symbol}
+                </div>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {opt.code}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {curMsg.text && (
+            <div style={{
+              marginTop: '14px', padding: '9px 12px', borderRadius: 'var(--radius-md)',
+              fontSize: '0.78rem', fontWeight: 500,
+              background: curMsg.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+              border: `1px solid ${curMsg.type === 'success' ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}`,
+              color: curMsg.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+            }}>
+              {curMsg.text}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+            <button onClick={() => setCurOpen(false)} disabled={curLoading}
+              style={{
+                padding: '8px 18px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem',
+                fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)',
+                background: 'transparent', color: 'var(--text-secondary)',
+              }}>
+              Cancel
+            </button>
+            <button onClick={handleCurSave} disabled={curLoading || selectedCurrency === currency}
+              style={{
+                padding: '8px 20px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem',
+                fontWeight: 600, cursor: curLoading || selectedCurrency === currency ? 'not-allowed' : 'pointer',
+                border: 'none', background: 'var(--accent)', color: '#fff',
+                opacity: curLoading || selectedCurrency === currency ? 0.6 : 1,
+              }}>
+              {curLoading ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
     </Layout>
   );
 }

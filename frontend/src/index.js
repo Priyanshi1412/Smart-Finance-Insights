@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { FinancialHealthProvider } from './context/FinancialHealthContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 import App from './App';
 import './index.css';
 
@@ -13,9 +14,11 @@ root.render(
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <FinancialHealthProvider>
-            <App />
-          </FinancialHealthProvider>
+          <CurrencyProvider>
+            <FinancialHealthProvider>
+              <App />
+            </FinancialHealthProvider>
+          </CurrencyProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
