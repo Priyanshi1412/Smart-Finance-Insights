@@ -90,6 +90,8 @@ export const expenseAPI = {
 export const budgetAPI = {
   getAll: () => api.get('/api/budget'),
   create: (data) => api.post('/api/budget', data),
+  update: (id, data) => api.put(`/api/budget/${id}`, data),
+  delete: (id) => api.delete(`/api/budget/${id}`),
 };
 
 export const goalAPI = {
@@ -144,6 +146,40 @@ export const mlAPI = {
   getFinancialInsights: () => api.get('/api/ml/financial-insights'),
   getPredictions: () => api.get('/api/ml/predictions'),
   analyze: () => api.post('/api/ml/analyze'),
+};
+
+export const reportAPI = {
+  getMonthlyExpenses: (month) => api.get(`/api/reports/monthly-expenses?month=${month}`),
+  getBudgetUtilization: (month) => api.get(`/api/reports/budget-utilization?month=${month}`),
+  getInvestmentPerformance: () => api.get('/api/reports/investment-performance'),
+  getGoalProgress: () => api.get('/api/reports/goal-progress'),
+  exportCSV: (type, month) => {
+    let url = `/api/reports/export/csv?type=${type}`;
+    if (month) url += `&month=${month}`;
+    return api.get(url, { responseType: 'blob' });
+  },
+  exportPDF: (type, month) => {
+    let url = `/api/reports/export/pdf?type=${type}`;
+    if (month) url += `&month=${month}`;
+    return api.get(url);
+  },
+  askJARVIS: (message) => api.post('/api/jarvis/chat', { message }),
+};
+
+export const exportAPI = {
+  expensePDF: () => api.get('/api/export/expenses/pdf', { responseType: 'blob' }),
+  expenseCSV: () => api.get('/api/export/expenses/csv', { responseType: 'blob' }),
+  expenseExcel: () => api.get('/api/export/expenses/xlsx', { responseType: 'blob' }),
+  investmentPDF: () => api.get('/api/export/investments/pdf', { responseType: 'blob' }),
+  investmentCSV: () => api.get('/api/export/investments/csv', { responseType: 'blob' }),
+  investmentExcel: () => api.get('/api/export/investments/excel', { responseType: 'blob' }),
+  financialPDF: () => api.get('/api/export/financial-report/pdf', { responseType: 'blob' }),
+  financialCSV: () => api.get('/api/export/financial-report/csv', { responseType: 'blob' }),
+  financialExcel: () => api.get('/api/export/financial-report/xlsx', { responseType: 'blob' }),
+  goalPDF: () => api.get('/api/export/goals/pdf', { responseType: 'blob' }),
+  goalCSV: () => api.get('/api/export/goals/csv', { responseType: 'blob' }),
+  goalExcel: () => api.get('/api/export/goals/xlsx', { responseType: 'blob' }),
+  comprehensiveCSV: () => api.get('/api/export/comprehensive/csv', { responseType: 'blob' }),
 };
 
 export default api;

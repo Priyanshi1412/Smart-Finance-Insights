@@ -72,6 +72,9 @@ const notificationRoutes = require('./routes/notifications');
 const userRoutes = require('./routes/user');
 const mlRoutes = require('./routes/ml');
 const settingsRoutes = require('./routes/settings');
+const reportRoutes = require('./routes/reportRoutes');
+const jarvisRoutes = require('./routes/jarvisRoutes');
+const exportRoutes = require('./routes/export');
 
 app.use('/api', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -85,7 +88,10 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/ml', mlRoutes);
-app.use('/api', settingsRoutes);
+app.use('/api/reports', reportRoutes);
+  app.use('/api/jarvis', jarvisRoutes);
+  app.use('/api/export', exportRoutes);
+  app.use('/api', settingsRoutes);
 
 // Global error handler
 app.use(errorHandler);

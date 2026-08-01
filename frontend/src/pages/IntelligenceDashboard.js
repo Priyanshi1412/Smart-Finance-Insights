@@ -635,6 +635,7 @@ export default function IntelligenceDashboard() {
                     { label: 'Spending Analysis', path: '/spending-pattern-analysis', color: 'var(--accent)' },
                     { label: 'AI Insights', path: '/ai-insights', color: 'var(--purple)' },
                     { label: 'Goal Planning', path: '/financial-goal-planning', color: 'var(--success)' },
+                    { label: 'View Detailed Reports', path: '/reports', color: 'var(--warning)' },
                   ].map((action, i) => (
                     <button key={i} onClick={() => navigate(action.path)} style={{
                       padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: '0.75rem', fontWeight: 600,

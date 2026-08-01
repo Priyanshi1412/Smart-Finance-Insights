@@ -1,40 +1,13 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "name": "Smart Finance Insights",
-  "builds": [
+  "framework": "create-react-app",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/build",
+  "installCommand": "npm install",
+  "rewrites": [
     {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+      "source": "/api/:path*",
+      "destination": "/api/index.js"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/build/$1"
-    }
-  ],
-  "env": {
-    "MONGODB_URI": "@mongodb-uri",
-    "JWT_SECRET": "@jwt-secret",
-    "CORS_ORIGIN": "@cors-origin",
-    "ML_SERVICE_URL": "@ml-service-url",
-    "ML_TIMEOUT": "10000",
-    "ML_RETRIES": "2"
-  },
-  "outputDirectory": "frontend/build"
+  ]
 }

@@ -8,6 +8,9 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config();
 const mlService = require('./services/mlService');
+const jarvisRoutes = require('./routes/jarvisRoutes');
+const exportRoutes = require('./routes/export');
+const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 
@@ -110,95 +113,7 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const userSchema = new mongoose.Schema({
-      name: { type: String, required: true },
-      email: { type: String, required: true, unique: true },
-      password: { type: String, required: true },
-      profilePicture: { type: String, default: '' },
-      currency: { type: String, default: 'INR' },
-      passwordChangedAt: { type: Date, default: null },
-      lastLoginAt: { type: Date, default: null },
-      createdAt: { type: Date, default: Date.now }
-    });
-
-    const incomeSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      amount: { type: Number, required: true },
-      source: { type: String, required: true },
-      date: { type: Date, default: Date.now },
-      description: { type: String }
-    });
-    incomeSchema.index({ userId: 1, date: -1 });
-
-    const expenseSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      amount: { type: Number, required: true },
-      category: { type: String, required: true },
-      date: { type: Date, default: Date.now },
-      description: { type: String }
-    });
-    expenseSchema.index({ userId: 1, date: -1 });
-
-    const budgetSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      category: { type: String, required: true },
-      limit: { type: Number, required: true },
-      month: { type: String, required: true }
-    });
-    budgetSchema.index({ userId: 1, month: 1 });
-
-    const goalSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      goalName: { type: String, required: true },
-      category: { type: String, required: true },
-      targetAmount: { type: Number, required: true },
-      savedAmount: { type: Number, default: 0 },
-      monthlySaving: { type: Number, default: 0 },
-      targetDate: { type: Date, required: true },
-      priority: { type: String, enum: ['high', 'medium', 'low'], default: 'medium' },
-      status: { type: String, enum: ['active', 'achieved', 'paused', 'overdue'], default: 'active' },
-      contributions: [{ amount: Number, date: { type: Date, default: Date.now }, note: String }],
-      createdAt: { type: Date, default: Date.now },
-      updatedAt: { type: Date, default: Date.now }
-    });
-    goalSchema.index({ userId: 1, status: 1 });
-
-    const investmentSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      name: { type: String, required: true },
-      type: { type: String, required: true },
-      category: { type: String, required: true },
-      amount: { type: Number, required: true },
-      currentValue: { type: Number, default: 0 },
-      investedDate: { type: Date, default: Date.now },
-      expectedReturns: { type: Number, default: 0 },
-      status: { type: String, default: 'active' },
-      notes: { type: String },
-      createdAt: { type: Date, default: Date.now },
-      updatedAt: { type: Date, default: Date.now }
-    });
-    investmentSchema.index({ userId: 1, status: 1 });
-
-    const notificationSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      type: { type: String, required: true },
-      title: { type: String, required: true },
-      message: { type: String, required: true },
-      priority: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
-      read: { type: Boolean, default: false },
-      category: { type: String },
-      amount: { type: Number },
-      createdAt: { type: Date, default: Date.now }
-    });
-    notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
-
-    const User = mongoose.model('User', userSchema);
-    const Income = mongoose.model('Income', incomeSchema);
-    const Expense = mongoose.model('Expense', expenseSchema);
-    const Budget = mongoose.model('Budget', budgetSchema);
-    const Goal = mongoose.model('Goal', goalSchema);
-    const Investment = mongoose.model('Investment', investmentSchema);
-    const Notification = mongoose.model('Notification', notificationSchema);
+    const { User, Income, Expense, Budget, Goal, Investment, Notification } = require('./models');
 
     function dateOnly(d) {
       const dt = new Date(d);
@@ -1997,6 +1912,15 @@ async function startServer() {
         res.status(500).json({ error: 'ML service error', fallback: true });
       }
     });
+
+    // Report routes
+    app.use('/api/reports', reportRoutes);
+
+    // Export routes
+    app.use('/api/export', exportRoutes);
+
+    // JARVIS conversational AI routes
+    app.use('/api/jarvis', jarvisRoutes);
 
     // Global error handler
     app.use((err, req, res, next) => {

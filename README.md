@@ -33,7 +33,7 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Portfolio Analytics** — Comprehensive analytics combining investments and goals, risk scoring, performance tables
 - **Spending Pattern Analysis** — Category-wise spending breakdown with trend analysis
 - **AI Insights** — Rule-based recommendations from your spending data
-- **Reports** — Financial metrics and savings rate analysis
+- **Advanced Financial Reports** — Complete reporting center with 4 report types: Monthly Expenses, Budget Utilization, Investment Performance, Goal Progress; supports PDF/CSV export and JARVIS AI assistant integration
 - **Notifications** — Bell icon drawer in top nav + standalone notifications page with auto-generated alerts for budget warnings, goal deadlines (with urgent 7-day tier), unusual spending patterns, investment reviews, and low savings
 - **Landing Page** — Public marketing page for unauthenticated visitors
 
@@ -102,8 +102,14 @@ Smart Finance Insights/
 │
 ├── backend/
 │   ├── index.js              # Express server + all models/routes (~2020 lines)
+│   ├── server.js             # Modular Express server with separate route files
 │   ├── services/
-│   │   └── mlService.js      # ML service client (Axios, timeout, retry, health checks)
+│   │   ├── mlService.js      # ML service client (Axios, timeout, retry, health checks)
+│   │   └── reportService.js  # Report generation service (MongoDB aggregation)
+│   ├── controllers/
+│   │   └── reportController.js # Report API handlers
+│   ├── routes/
+│   │   └── reportRoutes.js   # Report API route definitions
 │   ├── package.json
 │   └── .env                  # Environment variables
 │
@@ -128,6 +134,7 @@ Smart Finance Insights/
 │   │   │   ├── Layout.js        # Sidebar + topbar + notification bell drawer + avatar
 │   │   │   ├── Icon.js          # 60+ SVG icon paths
 │   │   │   ├── ErrorBoundary.js # React error boundary with recovery UI
+│   │   │   ├── JARVISAssistant.js # Interactive financial assistant chatbot widget
 │   │   │   └── ui/
 │   │   │       ├── Button.js         # 5 variants + loading
 │   │   │       ├── Card.js           # Glassmorphism + hover glow
@@ -149,7 +156,7 @@ Smart Finance Insights/
 │   │   │   ├── Income.js                # /income — CRUD
 │   │   │   ├── Expenses.js              # /expenses — CRUD
 │   │   │   ├── Budget.js                # /budget — Limits
-│   │   │   ├── Reports.js               # /reports — Analytics
+│   │   │   ├── Reports.js               # /reports — Advanced Financial Reporting Center
 │   │   │   ├── FinancialGoalPlanning.js # /financial-goal-planning — Goals + analytics
 │   │   │   ├── Investments.js           # /investments — CRUD + Portfolio
 │   │   │   ├── AssetAllocation.js       # /asset-allocation — Allocation breakdown
@@ -395,6 +402,56 @@ React Frontend → Express Backend → Flask ML Service → Response → Fronten
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `DELETE` | `/api/clear-data` | Clear all user data (income, expenses, budgets, goals, investments, notifications) |
+
+### Advanced Financial Reports (Milestone 4)
+
+The Reports page has been upgraded to a complete **Advanced Financial Reporting Center** with 4 report types, export capabilities, and an integrated JARVIS AI assistant.
+
+**Report Types:**
+- **Monthly Expense Report** — Detailed expense analysis with category breakdown, daily trends, month-over-month comparison, highest/lowest spending categories
+- **Budget Utilization Report** — Budget vs actual spending with progress bars, status indicators (Safe/Warning/Exceeded), overall budget health summary
+- **Investment Performance Report** — Portfolio analysis with ROI tracking, best/worst performers, asset allocation charts, profit/loss breakdown
+- **Goal Progress Report** — Goal tracking with completion percentages, status distribution (Active/Achieved/Overdue), category distribution, estimated completion dates
+
+**Reporting API Endpoints:**
+
+| Method | Endpoint | Parameters | Description |
+|--------|----------|------------|-------------|
+| `GET` | `/api/reports/monthly-expenses` | `month=YYYY-MM` | Generate monthly expense report |
+| `GET` | `/api/reports/budget-utilization` | `month=YYYY-MM` | Generate budget utilization report |
+| `GET` | `/api/reports/investment-performance` | — | Generate investment performance report |
+| `GET` | `/api/reports/goal-progress` | — | Generate goal progress report |
+| `GET` | `/api/reports/export/csv` | `type, month` | Export report as CSV file |
+| `GET` | `/api/reports/export/pdf` | `type, month` | Export report as printable HTML |
+| `POST` | `/api/reports/jarvis` | `{ query }` | Ask JARVIS financial assistant |
+
+**Export Types:** `monthly-expenses`, `budget-utilization`, `investment-performance`, `goal-progress`
+
+**JARVIS Financial Assistant:**
+An interactive chatbot widget integrated into the Reports page that answers financial questions using existing data. Supports queries like:
+- "How much did I spend this month?"
+- "Show my budget status"
+- "What is my savings rate?"
+- "Which category has the highest expense?"
+- "How are my investments performing?"
+- "How much is remaining for my emergency fund goal?"
+- "Generate my monthly expense summary"
+
+JARVIS uses rule-based logic with existing backend data — no external AI service required.
+
+**Frontend Components:**
+- `JARVISAssistant.js` — Reusable chatbot widget (standalone floating button or embedded panel)
+- `Reports.js` — Complete rewrite with tab navigation, date selectors, Chart.js visualizations, data tables, and export buttons
+
+**Backend Services:**
+- `services/reportService.js` — Report generation service with MongoDB aggregation pipelines
+- `controllers/reportController.js` — API handlers for all report endpoints
+- `routes/reportRoutes.js` — Express route definitions
+
+**Reporting Workflow:**
+```
+Select Report Type → Choose Month/Date Range → Generate Report → Display Charts + Tables + Summary → Export PDF/CSV/Print
+```
 
 ---
 

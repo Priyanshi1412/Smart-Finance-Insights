@@ -6,6 +6,7 @@ import { useFinancialHealth } from '../context/FinancialHealthContext';
 import Icon, { icons } from './Icon';
 import ProgressRing from './ui/ProgressRing';
 import { notificationAPI } from '../services/api';
+import JARVISAssistant from './JARVISAssistant';
 
 const menu = [
   { label: 'Dashboard', path: '/dashboard', icon: icons.dashboard },
@@ -342,6 +343,7 @@ export default function Layout({ children, title, centerContent = false }) {
           {children}
         </div>
       </main>
+      <JARVISAssistant />
     </div>
   );
 }

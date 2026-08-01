@@ -29,6 +29,9 @@ export default function Budget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [editingBudget, setEditingBudget] = useState(null);
+  const [editForm, setEditForm] = useState({ category: '', limit: '', month: '' });
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     if (!localStorage.getItem('token')) { navigate('/login'); return; }
@@ -56,6 +59,36 @@ export default function Budget() {
       load();
       refreshHealth();
     } catch (err) { setError(err.response?.data?.error || 'Failed'); }
+  };
+
+  const handleEdit = (budget) => {
+    setEditingBudget(budget);
+    setEditForm({ category: budget.category, limit: budget.limit, month: budget.month });
+    setError(''); setSuccess('');
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setError(''); setSuccess('');
+    if (!editForm.limit || Number(editForm.limit) <= 0) { setError('Enter a valid limit'); return; }
+    try {
+      await budgetAPI.update(editingBudget._id, { ...editForm, limit: Number(editForm.limit) });
+      setSuccess('Budget updated');
+      setEditingBudget(null);
+      load();
+      refreshHealth();
+    } catch (err) { setError(err.response?.data?.error || 'Failed to update'); }
+  };
+
+  const handleDelete = async (id) => {
+    setError(''); setSuccess('');
+    try {
+      await budgetAPI.delete(id);
+      setSuccess('Budget deleted');
+      setDeletingId(null);
+      load();
+      refreshHealth();
+    } catch (err) { setError(err.response?.data?.error || 'Failed to delete'); }
   };
 
   const getSpent = (cat, month) => {
@@ -174,13 +207,41 @@ export default function Budget() {
             <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--warning-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon path={icons.plus} size={18} />
             </div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Set Budget</h2>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{editingBudget ? 'Edit Budget' : 'Set Budget'}</h2>
           </div>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <Select label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categories.map(c => ({ value: c, label: c }))} required />
-            <Input label="Monthly Limit" type="number" min="1" step="1" placeholder="0" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} required />
-            <Input label="Month" type="month" value={form.month} onChange={(e) => setForm({ ...form, month: e.target.value })} required />
-            <Button type="submit" fullWidth variant="success">Set Budget</Button>
+          <form onSubmit={editingBudget ? handleEditSubmit : handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <Select
+              label="Category"
+              value={editingBudget ? editForm.category : form.category}
+              onChange={(e) => editingBudget ? setEditForm({ ...editForm, category: e.target.value }) : setForm({ ...form, category: e.target.value })}
+              options={categories.map(c => ({ value: c, label: c }))}
+              required
+            />
+            <Input
+              label="Monthly Limit"
+              type="number"
+              min="1"
+              step="1"
+              placeholder="0"
+              value={editingBudget ? editForm.limit : form.limit}
+              onChange={(e) => editingBudget ? setEditForm({ ...editForm, limit: e.target.value }) : setForm({ ...form, limit: e.target.value })}
+              required
+            />
+            <Input
+              label="Month"
+              type="month"
+              value={editingBudget ? editForm.month : form.month}
+              onChange={(e) => editingBudget ? setEditForm({ ...editForm, month: e.target.value }) : setForm({ ...form, month: e.target.value })}
+              required
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <Button type="submit" fullWidth variant="success">{editingBudget ? 'Update Budget' : 'Set Budget'}</Button>
+              {editingBudget && (
+                <Button type="button" fullWidth variant="secondary" onClick={() => { setEditingBudget(null); setError(''); setSuccess(''); }}>
+                  Cancel
+                </Button>
+              )}
+            </div>
           </form>
         </Card>
 
@@ -200,12 +261,40 @@ export default function Budget() {
                 const textColor = pct >= 100 ? 'var(--danger-light)' : pct >= 80 ? 'var(--warning-light)' : 'var(--success-light)';
                 return (
                   <div key={b._id} style={{ padding: '16px', borderRadius: 'var(--radius-md)', background: 'var(--bg-glass)', border: '1px solid var(--border-light)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                       <div>
                         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{b.category}</span>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '8px' }}>{b.month}</span>
                       </div>
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: textColor }}>{Math.round(pct)}%</span>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: textColor }}>{Math.round(pct)}%</span>
+                        <button
+                          onClick={() => handleEdit(b)}
+                          title="Edit budget"
+                          style={{
+                            width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+                            background: 'var(--accent-glow)', border: '1px solid rgba(59,130,246,0.2)',
+                            color: 'var(--accent-light)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <Icon path="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" size={13} />
+                        </button>
+                        <button
+                          onClick={() => setDeletingId(b._id)}
+                          title="Delete budget"
+                          style={{
+                            width: 28, height: 28, borderRadius: 'var(--radius-sm)',
+                            background: 'var(--danger-glow)', border: '1px solid rgba(239,68,68,0.2)',
+                            color: 'var(--danger-light)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <Icon path="M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" size={13} />
+                        </button>
+                      </div>
                     </div>
                     <div style={{ height: 6, borderRadius: 999, background: 'var(--border)', overflow: 'hidden' }}>
                       <div style={{ height: '100%', borderRadius: 999, width: `${pct}%`, background: color, transition: 'width 0.8s ease' }} />
@@ -214,6 +303,35 @@ export default function Budget() {
                       <span>Spent: {fmt(spent)}</span>
                       <span>Limit: {fmt(b.limit)}</span>
                     </div>
+                    {deletingId === b._id && (
+                      <div style={{ marginTop: '12px', padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--danger-glow)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-primary)', margin: '0 0 10px', fontWeight: 600 }}>
+                          Delete this budget?
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleDelete(b._id)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 'var(--radius-sm)',
+                              background: 'var(--danger)', color: '#fff', border: 'none',
+                              fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(null)}
+                            style={{
+                              padding: '6px 14px', borderRadius: 'var(--radius-sm)',
+                              background: 'var(--bg-glass)', border: '1px solid var(--border-light)',
+                              color: 'var(--text-secondary)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
