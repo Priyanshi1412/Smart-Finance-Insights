@@ -108,10 +108,37 @@ app.param('id', (req, res, next, value) => {
   next();
 });
 
+const MONGOOSE_OPTIONS = {
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
+  connectTimeoutMS: 10000,
+  maxPoolSize: 10,
+  retryWrites: true,
+};
+
+async function connectWithRetry(retries = 3, delay = 5000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await mongoose.connect(MONGODB_URI, MONGOOSE_OPTIONS);
+      console.log('Connected to MongoDB');
+      return true;
+    } catch (err) {
+      console.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err.message);
+      if (attempt < retries) {
+        console.log(`Retrying in ${delay / 1000}s...`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  return false;
+}
+
 async function startServer() {
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('Connected to MongoDB');
+    const connected = await connectWithRetry();
+    if (!connected) {
+      throw new Error('Failed to connect to MongoDB after retries');
+    }
 
     const { User, Income, Expense, Budget, Goal, Investment, Notification } = require('./models');
 
@@ -1951,10 +1978,19 @@ async function startServer() {
     process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (err) {
     console.error('Failed to connect to MongoDB:', err.message);
-    const port = process.env.PORT || 4000;
-    app.listen(port, () => {
-      console.warn(`Backend listening on port ${port} (database not connected)`);
-    });
+    console.error('');
+    console.error('=== TROUBLESHOOTING ===');
+    console.error('1. Check if your MongoDB Atlas cluster is active (not paused)');
+    console.error('   -> Go to https://cloud.mongodb.com and verify cluster status');
+    console.error('2. Check your IP whitelist in Atlas');
+    console.error('   -> Network Access -> Add IP Address -> Allow Access from Anywhere (0.0.0.0/0)');
+    console.error('3. Verify your MongoDB username and password');
+    console.error('4. Try switching to local MongoDB:');
+    console.error('   -> Uncomment this line in backend/.env:');
+    console.error('   -> MONGODB_URI=mongodb://localhost:27017/smart_finance');
+    console.error('5. Check your network/firewall is not blocking DNS SRV queries');
+    console.error('======================');
+    process.exit(1);
   }
 }
 

@@ -414,134 +414,437 @@ export default function Settings() {
         .cur-opt.active { border-color: var(--accent); background: rgba(59,130,246,0.06);
           box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        .export-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 12px;
+        .export-section-wrap {
+          background: linear-gradient(145deg, rgba(11,20,38,0.78) 0%, rgba(13,27,54,0.65) 100%);
+          border: 1px solid rgba(148,163,184,0.14);
+          border-radius: 24px;
+          padding: 32px;
+          backdrop-filter: blur(18px);
+          box-shadow: 0 0 40px rgba(59,130,246,0.06), 0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        @media (min-width: 640px) {
-          .export-grid { grid-template-columns: 1fr 1fr; }
+        .export-section-wrap:hover {
+          box-shadow: 0 0 60px rgba(59,130,246,0.08), 0 12px 40px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05);
         }
-        .export-panel {
-          border: 1px solid var(--border);
+        [data-theme="light"] .export-section-wrap {
+          background: linear-gradient(145deg, rgba(255,255,255,0.92) 0%, rgba(248,250,252,0.88) 100%);
+          box-shadow: 0 0 40px rgba(59,130,246,0.04), 0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
+        }
+        .export-section-header {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+        .export-section-icon {
+          width: 44px;
+          height: 44px;
+          min-width: 44px;
           border-radius: var(--radius-lg);
-          background: var(--bg-secondary);
-          padding: 20px;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-        .export-panel:hover {
-          border-color: rgba(59,130,246,0.3);
-          box-shadow: 0 4px 24px rgba(59,130,246,0.06);
-        }
-        .export-panel-header {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-        }
-        .export-panel-icon {
-          width: 40px;
-          height: 40px;
-          min-width: 40px;
-          border-radius: var(--radius-md);
           display: flex;
           align-items: center;
           justify-content: center;
-          background: var(--accent-glow);
+          background: rgba(20,184,166,0.12);
+          border: 1px solid rgba(20,184,166,0.15);
+          box-shadow: 0 0 24px rgba(20,184,166,0.1);
         }
-        .export-panel-title {
+        .export-section-title {
+          font-size: 1rem;
           font-weight: 700;
-          color: 'var(--text-primary)';
-          font-size: 0.9rem;
-          line-height: 1.3;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          line-height: 1.2;
         }
-        .export-panel-desc {
-          font-size: 0.75rem;
+        .export-section-subtitle {
+          font-size: 0.8rem;
           color: var(--text-muted);
           margin-top: 2px;
-          line-height: 1.35;
+          line-height: 1.3;
         }
-        .format-selector {
+        .export-hero-wrap {
+          margin-bottom: 24px;
+        }
+        .export-hero-card {
+          background: linear-gradient(135deg, rgba(17,24,39,0.6) 0%, rgba(15,23,42,0.45) 100%);
+          border: 1px solid rgba(148,163,184,0.12);
+          border-radius: 20px;
+          padding: 36px 32px;
+          backdrop-filter: blur(14px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          text-align: center;
+          max-width: 480px;
+          margin: 0 auto;
+          position: relative;
+          overflow: hidden;
+        }
+        .export-hero-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 10%, rgba(59,130,246,0.2) 50%, transparent 90%);
+        }
+        .export-hero-card:hover {
+          border-color: rgba(59,130,246,0.2);
+          box-shadow: 0 8px 40px rgba(59,130,246,0.08), 0 0 0 1px rgba(59,130,246,0.06);
+        }
+        [data-theme="light"] .export-hero-card {
+          background: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(248,250,252,0.8) 100%);
+        }
+        [data-theme="light"] .export-hero-card:hover {
+          border-color: rgba(37,99,235,0.15);
+        }
+        .export-hero-icon {
+          width: 64px;
+          height: 64px;
+          margin: 0 auto 20px;
+          border-radius: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(20,184,166,0.1);
+          border: 1px solid rgba(20,184,166,0.12);
+          box-shadow: 0 0 32px rgba(20,184,166,0.1), 0 4px 16px rgba(0,0,0,0.15);
+        }
+        .export-hero-title {
+          font-weight: 800;
+          color: var(--text-primary);
+          font-size: 1.15rem;
+          line-height: 1.3;
+          margin-bottom: 8px;
+        }
+        .export-hero-desc {
+          font-size: 0.82rem;
+          color: var(--text-muted);
+          line-height: 1.5;
+          margin-bottom: 24px;
+          max-width: 340px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .export-hero-format {
+          display: inline-flex;
+          gap: 0;
+          border: 1px solid rgba(148,163,184,0.14);
+          border-radius: 12px;
+          overflow: hidden;
+          background: rgba(255,255,255,0.03);
+          margin-bottom: 20px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        [data-theme="light"] .export-hero-format {
+          background: rgba(0,0,0,0.02);
+        }
+        .export-hero-format .export-format-pill {
+          padding: 10px 20px;
+          font-size: 0.78rem;
+          letter-spacing: 0.04em;
+        }
+        .export-hero-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          width: 100%;
+          max-width: 260px;
+          padding: 14px 28px;
+          border-radius: 14px;
+          border: 1px solid var(--accent);
+          background: rgba(59,130,246,0.08);
+          color: var(--accent);
+          font-weight: 700;
+          font-size: 0.88rem;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          letter-spacing: 0.01em;
+        }
+        .export-hero-btn:hover:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+          box-shadow: 0 6px 24px rgba(59,130,246,0.3);
+          transform: translateY(-2px);
+        }
+        .export-hero-btn:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        [data-theme="light"] .export-hero-btn {
+          background: rgba(37,99,235,0.06);
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        [data-theme="light"] .export-hero-btn:hover:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+        }
+        .export-grid-2x2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+        .export-card {
+          background: linear-gradient(135deg, rgba(17,24,39,0.55) 0%, rgba(15,23,42,0.4) 100%);
+          border: 1px solid rgba(148,163,184,0.12);
+          border-radius: 20px;
+          padding: 24px;
+          backdrop-filter: blur(14px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          position: relative;
+          overflow: hidden;
+        }
+        .export-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 10%, rgba(148,163,184,0.1) 50%, transparent 90%);
+        }
+        .export-card:hover {
+          border-color: rgba(59,130,246,0.18);
+          box-shadow: 0 8px 32px rgba(59,130,246,0.06), 0 0 0 1px rgba(59,130,246,0.04);
+        }
+        [data-theme="light"] .export-card {
+          background: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(248,250,252,0.8) 100%);
+        }
+        [data-theme="light"] .export-card:hover {
+          border-color: rgba(37,99,235,0.12);
+        }
+        .export-card-header {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+        .export-card-icon {
+          width: 44px;
+          height: 44px;
+          min-width: 44px;
+          border-radius: var(--radius-lg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .export-card-title {
+          font-weight: 700;
+          color: var(--text-primary);
+          font-size: 0.92rem;
+          line-height: 1.3;
+        }
+        .export-card-desc {
+          font-size: 0.76rem;
+          color: var(--text-muted);
+          margin-top: 2px;
+          line-height: 1.4;
+        }
+        .export-format-bar {
           display: flex;
           gap: 0;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
+          border: 1px solid rgba(148,163,184,0.14);
+          border-radius: 12px;
           overflow: hidden;
-          background: var(--bg-glass);
+          background: rgba(255,255,255,0.03);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
         }
-        .format-option {
+        [data-theme="light"] .export-format-bar {
+          background: rgba(0,0,0,0.02);
+        }
+        .export-format-pill {
           flex: 1;
-          padding: 7px 0;
+          padding: 10px 0;
           border: none;
           background: transparent;
-          font-size: 0.72rem;
+          font-size: 0.74rem;
           font-weight: 600;
           color: var(--text-muted);
           cursor: pointer;
           transition: all 0.2s ease;
           text-transform: uppercase;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.04em;
           position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 4px;
+          gap: 5px;
         }
-        .format-option:not(:last-child) {
-          border-right: 1px solid var(--border);
+        .export-format-pill:not(:last-child) {
+          border-right: 1px solid rgba(148,163,184,0.1);
         }
-        .format-option:hover {
+        .export-format-pill:hover {
           color: var(--text-secondary);
-          background: var(--bg-glass);
+          background: rgba(255,255,255,0.04);
         }
-        .format-option.active {
+        [data-theme="light"] .export-format-pill:hover {
+          background: rgba(0,0,0,0.02);
+        }
+        .export-format-pill.active {
           color: var(--accent);
-          background: rgba(59,130,246,0.08);
+          background: rgba(59,130,246,0.1);
           font-weight: 700;
+          box-shadow: inset 0 0 12px rgba(59,130,246,0.06);
         }
-        .format-option.active::after {
+        .export-format-pill.active::after {
           content: '';
           position: absolute;
           bottom: 0;
-          left: 15%;
-          right: 15%;
+          left: 20%;
+          right: 20%;
           height: 2px;
           background: var(--accent);
           border-radius: 2px 2px 0 0;
+          box-shadow: 0 0 8px rgba(59,130,246,0.4);
         }
-        .export-action-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          width: 100%;
-          padding: 10px 16px;
-          border-radius: var(--radius-md);
-          border: 1px solid var(--accent);
-          background: rgba(59,130,246,0.06);
-          color: var(--accent);
-          font-weight: 600;
-          font-size: 0.82rem;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .export-action-btn:hover:not(:disabled) {
-          background: var(--accent);
-          color: #fff;
-          box-shadow: 0 4px 16px rgba(59,130,246,0.25);
-          transform: translateY(-1px);
-        }
-        .export-action-btn:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
-        .format-dot {
+        .export-format-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
           display: inline-block;
+        }
+        .export-btn-primary {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          width: 100%;
+          padding: 13px 20px;
+          border-radius: 14px;
+          border: 1px solid var(--accent);
+          background: rgba(59,130,246,0.08);
+          color: var(--accent);
+          font-weight: 700;
+          font-size: 0.84rem;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          letter-spacing: 0.01em;
+        }
+        .export-btn-primary:hover:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+          box-shadow: 0 6px 24px rgba(59,130,246,0.25);
+          transform: translateY(-2px);
+        }
+        .export-btn-primary:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+        [data-theme="light"] .export-btn-primary {
+          background: rgba(37,99,235,0.06);
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        [data-theme="light"] .export-btn-primary:hover:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+        }
+        .export-danger-card {
+          background: linear-gradient(135deg, rgba(17,24,39,0.55) 0%, rgba(15,23,42,0.4) 100%);
+          border: 1px solid rgba(239,68,68,0.12);
+          border-radius: 20px;
+          padding: 24px;
+          backdrop-filter: blur(14px);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        .export-danger-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 10%, rgba(239,68,68,0.15) 50%, transparent 90%);
+        }
+        .export-danger-card:hover {
+          border-color: rgba(239,68,68,0.22);
+          box-shadow: 0 6px 28px rgba(239,68,68,0.06);
+        }
+        [data-theme="light"] .export-danger-card {
+          background: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(248,250,252,0.8) 100%);
+        }
+        .export-danger-info {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex: 1;
+          min-width: 0;
+        }
+        .export-danger-icon {
+          width: 44px;
+          height: 44px;
+          min-width: 44px;
+          border-radius: var(--radius-lg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--danger-glow);
+          border: 1px solid rgba(239,68,68,0.1);
+          box-shadow: 0 0 20px rgba(239,68,68,0.08);
+        }
+        .export-danger-title {
+          font-weight: 700;
+          color: var(--danger-light);
+          font-size: 0.92rem;
+        }
+        .export-danger-desc {
+          font-size: 0.78rem;
+          color: var(--text-muted);
+          margin-top: 2px;
+          line-height: 1.4;
+        }
+        .export-danger-btn {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 24px;
+          border-radius: 14px;
+          background: transparent;
+          border: 1px solid var(--danger);
+          color: var(--danger-light);
+          font-weight: 700;
+          font-size: 0.84rem;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.25s ease;
+        }
+        .export-danger-btn:hover:not(:disabled) {
+          background: rgba(239,68,68,0.1);
+          border-color: var(--danger-light);
+          box-shadow: 0 4px 20px rgba(239,68,68,0.12);
+          transform: translateY(-2px);
+        }
+        .export-danger-btn:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        @media (max-width: 680px) {
+          .export-section-wrap {
+            padding: 24px 20px;
+          }
+          .export-grid-2x2 {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          .export-hero-card {
+            padding: 28px 24px;
+          }
+          .export-hero-format .export-format-pill {
+            padding: 9px 16px;
+            font-size: 0.74rem;
+          }
+          .export-danger-card {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 20px;
+          }
+          .export-danger-btn {
+            width: 100%;
+            justify-content: center;
+          }
         }
       `}</style>
 
@@ -723,47 +1026,36 @@ export default function Settings() {
 
         {/* ═══ Data & Export Center ═══ */}
         <div style={{ ...fadeInUp, ...stagger(3) }}>
-          <Card className="section-card" style={{ padding: '24px 28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 'var(--radius-md)',
-                background: 'var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon path={icons.reports} size={18} />
+          <div className="export-section-wrap">
+            <div className="export-section-header">
+              <div className="export-section-icon">
+                <Icon path={icons.reports} size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Data & Export Center
-                </h3>
-                <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', margin: 0 }}>
-                  Export your financial data in multiple formats
-                </p>
+                <div className="export-section-title">Data & Export Center</div>
+                <div className="export-section-subtitle">Export your financial data in multiple formats</div>
               </div>
             </div>
 
-            <div className="export-grid">
-              {/* Complete Financial Data */}
-              <div className="export-panel">
-                <div className="export-panel-header">
-                  <div className="export-panel-icon" style={{ background: 'rgba(16,185,129,0.12)' }}>
-                    <Icon path={icons.reports} size={18} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="export-panel-title">Complete Financial Data</div>
-                    <div className="export-panel-desc">All income, expenses, budgets, goals & investments</div>
-                  </div>
+            {/* Hero Card: Complete Financial Data */}
+            <div className="export-hero-wrap">
+              <div className="export-hero-card">
+                <div className="export-hero-icon">
+                  <Icon path={icons.reports} size={26} />
                 </div>
-                <div className="format-selector">
+                <div className="export-hero-title">Complete Financial Data</div>
+                <div className="export-hero-desc">All income, expenses, budgets, goals & investments in a single file</div>
+                <div className="export-hero-format">
                   <button
-                    className={`format-option active`}
+                    className="export-format-pill active"
                     style={{ cursor: 'default' }}
                   >
-                    <span className="format-dot" style={{ background: '#10b981' }} />
+                    <span className="export-format-dot" style={{ background: '#10b981' }} />
                     CSV
                   </button>
                 </div>
                 <button
-                  className="export-action-btn"
+                  className="export-hero-btn"
                   onClick={() => handleUniversalExport('comprehensive')}
                   disabled={exportingKey === 'comprehensive-csv'}
                 >
@@ -786,26 +1078,30 @@ export default function Settings() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* 2x2 Grid */}
+            <div className="export-grid-2x2">
 
               {/* Expense Report */}
-              <div className="export-panel">
-                <div className="export-panel-header">
-                  <div className="export-panel-icon" style={{ background: 'rgba(59,130,246,0.12)' }}>
-                    <Icon path={icons.expenses} size={18} />
+              <div className="export-card">
+                <div className="export-card-header">
+                  <div className="export-card-icon" style={{ background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.1)' }}>
+                    <Icon path={icons.expenses} size={20} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="export-panel-title">Expense Report</div>
-                    <div className="export-panel-desc">Monthly expenses with category breakdown</div>
+                  <div>
+                    <div className="export-card-title">Expense Report</div>
+                    <div className="export-card-desc">Monthly expenses with category breakdown</div>
                   </div>
                 </div>
-                <div className="format-selector">
+                <div className="export-format-bar">
                   {['pdf', 'csv', 'xlsx'].map(f => (
                     <button
                       key={f}
-                      className={`format-option ${formats.expenses === f ? 'active' : ''}`}
+                      className={`export-format-pill ${formats.expenses === f ? 'active' : ''}`}
                       onClick={() => setFormat('expenses', f)}
                     >
-                      <span className="format-dot" style={{
+                      <span className="export-format-dot" style={{
                         background: f === 'pdf' ? '#ef4444' : f === 'csv' ? '#10b981' : '#14b8a6',
                       }} />
                       {f.toUpperCase()}
@@ -813,9 +1109,9 @@ export default function Settings() {
                   ))}
                 </div>
                 <button
-                  className="export-action-btn"
+                  className="export-btn-primary"
                   onClick={() => handleUniversalExport('expenses')}
-                  disabled={!formats.expenses || exportingKey === 'expenses-pdf' || exportingKey === 'expenses-csv' || exportingKey === 'expenses-xlsx'}
+                  disabled={!formats.expenses || exportingKey === `expenses-${formats.expenses}`}
                 >
                   {exportingKey === `expenses-${formats.expenses}` ? (
                     <>
@@ -838,24 +1134,24 @@ export default function Settings() {
               </div>
 
               {/* Investment Report */}
-              <div className="export-panel">
-                <div className="export-panel-header">
-                  <div className="export-panel-icon" style={{ background: 'rgba(20,184,166,0.12)' }}>
-                    <Icon path={icons.investments} size={18} />
+              <div className="export-card">
+                <div className="export-card-header">
+                  <div className="export-card-icon" style={{ background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.1)' }}>
+                    <Icon path={icons.investments} size={20} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="export-panel-title">Investment Report</div>
-                    <div className="export-panel-desc">Portfolio performance & ROI analysis</div>
+                  <div>
+                    <div className="export-card-title">Investment Report</div>
+                    <div className="export-card-desc">Portfolio performance & ROI analysis</div>
                   </div>
                 </div>
-                <div className="format-selector">
+                <div className="export-format-bar">
                   {['pdf', 'csv', 'xlsx'].map(f => (
                     <button
                       key={f}
-                      className={`format-option ${formats.investments === f ? 'active' : ''}`}
+                      className={`export-format-pill ${formats.investments === f ? 'active' : ''}`}
                       onClick={() => setFormat('investments', f)}
                     >
-                      <span className="format-dot" style={{
+                      <span className="export-format-dot" style={{
                         background: f === 'pdf' ? '#ef4444' : f === 'csv' ? '#10b981' : '#14b8a6',
                       }} />
                       {f.toUpperCase()}
@@ -863,9 +1159,9 @@ export default function Settings() {
                   ))}
                 </div>
                 <button
-                  className="export-action-btn"
+                  className="export-btn-primary"
                   onClick={() => handleUniversalExport('investments')}
-                  disabled={!formats.investments}
+                  disabled={!formats.investments || exportingKey === `investments-${formats.investments}`}
                 >
                   {exportingKey === `investments-${formats.investments}` ? (
                     <>
@@ -887,25 +1183,25 @@ export default function Settings() {
                 </button>
               </div>
 
-              {/* Financial Summary */}
-              <div className="export-panel">
-                <div className="export-panel-header">
-                  <div className="export-panel-icon" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                    <Icon path={icons.dashboard} size={18} />
+              {/* Financial Report */}
+              <div className="export-card">
+                <div className="export-card-header">
+                  <div className="export-card-icon" style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.1)' }}>
+                    <Icon path={icons.dashboard} size={20} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="export-panel-title">Financial Summary</div>
-                    <div className="export-panel-desc">Complete financial statement overview</div>
+                  <div>
+                    <div className="export-card-title">Financial Report</div>
+                    <div className="export-card-desc">Complete financial statement overview</div>
                   </div>
                 </div>
-                <div className="format-selector">
+                <div className="export-format-bar">
                   {['pdf', 'csv', 'xlsx'].map(f => (
                     <button
                       key={f}
-                      className={`format-option ${formats['financial-report'] === f ? 'active' : ''}`}
+                      className={`export-format-pill ${formats['financial-report'] === f ? 'active' : ''}`}
                       onClick={() => setFormat('financial-report', f)}
                     >
-                      <span className="format-dot" style={{
+                      <span className="export-format-dot" style={{
                         background: f === 'pdf' ? '#ef4444' : f === 'csv' ? '#10b981' : '#14b8a6',
                       }} />
                       {f.toUpperCase()}
@@ -913,9 +1209,9 @@ export default function Settings() {
                   ))}
                 </div>
                 <button
-                  className="export-action-btn"
+                  className="export-btn-primary"
                   onClick={() => handleUniversalExport('financial-report')}
-                  disabled={!formats['financial-report']}
+                  disabled={!formats['financial-report'] || exportingKey === `financial-report-${formats['financial-report']}`}
                 >
                   {exportingKey === `financial-report-${formats['financial-report']}` ? (
                     <>
@@ -938,24 +1234,24 @@ export default function Settings() {
               </div>
 
               {/* Goal Progress */}
-              <div className="export-panel">
-                <div className="export-panel-header">
-                  <div className="export-panel-icon" style={{ background: 'rgba(245,158,11,0.12)' }}>
-                    <Icon path={icons.target} size={18} />
+              <div className="export-card">
+                <div className="export-card-header">
+                  <div className="export-card-icon" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.1)' }}>
+                    <Icon path={icons.target} size={20} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div className="export-panel-title">Goal Progress</div>
-                    <div className="export-panel-desc">Savings goals tracking & completion status</div>
+                  <div>
+                    <div className="export-card-title">Goal Progress</div>
+                    <div className="export-card-desc">Savings goals tracking & completion status</div>
                   </div>
                 </div>
-                <div className="format-selector">
+                <div className="export-format-bar">
                   {['pdf', 'csv', 'xlsx'].map(f => (
                     <button
                       key={f}
-                      className={`format-option ${formats.goals === f ? 'active' : ''}`}
+                      className={`export-format-pill ${formats.goals === f ? 'active' : ''}`}
                       onClick={() => setFormat('goals', f)}
                     >
-                      <span className="format-dot" style={{
+                      <span className="export-format-dot" style={{
                         background: f === 'pdf' ? '#ef4444' : f === 'csv' ? '#10b981' : '#14b8a6',
                       }} />
                       {f.toUpperCase()}
@@ -963,9 +1259,9 @@ export default function Settings() {
                   ))}
                 </div>
                 <button
-                  className="export-action-btn"
+                  className="export-btn-primary"
                   onClick={() => handleUniversalExport('goals')}
-                  disabled={!formats.goals}
+                  disabled={!formats.goals || exportingKey === `goals-${formats.goals}`}
                 >
                   {exportingKey === `goals-${formats.goals}` ? (
                     <>
@@ -986,54 +1282,44 @@ export default function Settings() {
                   )}
                 </button>
               </div>
+
             </div>
 
-            <div style={{ height: 1, background: 'var(--border-light)', margin: '16px 0 12px' }} />
-
-            {/* Clear */}
-            <div className="setting-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div className="setting-icon" style={{
-                  width: 42, height: 42, borderRadius: 'var(--radius-md)',
-                  background: 'var(--danger-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Icon path={icons.trash} size={20} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, color: 'var(--danger-light)', fontSize: '0.95rem' }}>Clear All Data</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Permanently delete all your income, expenses, goals & investments
+            {/* Danger Zone */}
+            <div style={{ marginTop: '4px' }}>
+              <div className="export-danger-card">
+                <div className="export-danger-info">
+                  <div className="export-danger-icon">
+                    <Icon path={icons.trash} size={20} />
+                  </div>
+                  <div>
+                    <div className="export-danger-title">Clear All Data</div>
+                    <div className="export-danger-desc">Permanently delete all your income, expenses, goals & investments</div>
                   </div>
                 </div>
+                <button
+                  className="export-danger-btn"
+                  onClick={handleClearData}
+                  disabled={clearing}
+                >
+                  {clearing ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                      </svg>
+                      Clearing...
+                    </>
+                  ) : (
+                    <>
+                      <Icon path={icons.trash} size={14} />
+                      Clear Data
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                className="danger-btn"
-                onClick={handleClearData}
-                disabled={clearing}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '8px 18px', borderRadius: 'var(--radius-md)',
-                  background: 'linear-gradient(135deg, var(--danger), #b91c1c)',
-                  border: 'none', color: '#fff', fontWeight: 600, fontSize: '0.82rem',
-                  cursor: clearing ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {clearing ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
-                    </svg>
-                    Clearing...
-                  </>
-                ) : (
-                  <>
-                    <Icon path={icons.trash} size={14} />
-                    Clear Data
-                  </>
-                )}
-              </button>
             </div>
-          </Card>
+
+          </div>
         </div>
 
         {/* ═══ Security ═══ */}
@@ -1079,7 +1365,7 @@ export default function Settings() {
         </div>
 
         {/* ═══ Danger Zone ═══ */}
-        <div style={{ ...fadeInUp, ...stagger(5) }}>
+        <div style={{ ...fadeInUp, ...stagger(6) }}>
           <Card style={{
             padding: '24px 28px', border: '1px solid rgba(239,68,68,0.2)',
             background: 'linear-gradient(135deg, rgba(239,68,68,0.03) 0%, rgba(127,29,29,0.02) 100%)',

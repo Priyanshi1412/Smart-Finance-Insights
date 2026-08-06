@@ -102,6 +102,15 @@ async function startServer() {
     await connectDB();
   } catch (err) {
     console.error('Failed to connect to MongoDB:', err.message);
+    console.error('');
+    console.error('=== TROUBLESHOOTING ===');
+    console.error('1. Check if your MongoDB Atlas cluster is active (not paused)');
+    console.error('2. Check your IP whitelist in Atlas (Network Access -> Allow 0.0.0.0/0)');
+    console.error('3. Verify your MongoDB username and password in backend/.env');
+    console.error('4. Try local MongoDB: Uncomment MONGODB_URI in backend/.env');
+    console.error('5. Check your network is not blocking DNS SRV queries');
+    console.error('======================');
+    process.exit(1);
   }
 
   const port = process.env.PORT || 4000;
