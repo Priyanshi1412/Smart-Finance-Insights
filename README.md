@@ -11,7 +11,7 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 ![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.1.0-3B82F6?style=flat-square)
+![Version](https://img.shields.io/badge/Version-2.0.0-3B82F6?style=flat-square)
 ![License](https://img.shields.io/badge/License-Private-FF6B6B?style=flat-square)
 
 </div>
@@ -34,6 +34,7 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Spending Pattern Analysis** — Category-wise spending breakdown with trend analysis
 - **AI Insights** — Rule-based recommendations from your spending data
 - **Advanced Financial Reports** — Complete reporting center with 4 report types: Monthly Expenses, Budget Utilization, Investment Performance, Goal Progress; supports PDF/CSV export and JARVIS AI assistant integration
+- **Data Export Center** — Unified export hub in Settings with 4 report categories (Expenses, Investments, Financial Summary, Goals) + comprehensive CSV; supports PDF, CSV, and Excel (XLSX) formats with per-report format selection and download progress indicators
 - **Notifications** — Bell icon drawer in top nav + standalone notifications page with auto-generated alerts for budget warnings, goal deadlines (with urgent 7-day tier), unusual spending patterns, investment reviews, and low savings
 - **Landing Page** — Public marketing page for unauthenticated visitors
 
@@ -41,8 +42,10 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Multi-Currency Support** — 7 currencies (INR, USD, EUR, GBP, JPY, AUD, CAD) with persistent preference per user
 - **Profile Management** — Profile picture upload (JPG/PNG/WEBP, 2MB limit), account info display
 - **Change Password** — Secure password update via modal dialog
+- **Password Reset Utility** — Admin CLI tool (`node reset-password.js <email> <new-password>`) for emergency password resets
 - **Currency Preferences** — Change display currency via modal, persisted to backend
 - **Session Management** — Graceful JWT expiry handling with modal notification, auto-detection on boot
+- **Toast Notifications** — In-app toast feedback system for user actions (success/error messages)
 
 ### Design Features
 - **Glassmorphism UI** — Modern frosted glass aesthetic
@@ -52,7 +55,7 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Animations** — fadeIn, slideUp, scaleIn, pulse effects
 - **Progress Rings** — SVG circular progress indicators
 - **Protected Routes** — JWT-based auth guards with session expiry modal
-- **Code Splitting** — React.lazy + Suspense for all 20 pages
+- **Code Splitting** — React.lazy + Suspense for all 19 pages
 - **Error Boundary** — Graceful error handling with recovery UI
 - **Accessibility** — Reduced motion, focus-visible outlines, skip-to-content link
 
@@ -65,6 +68,9 @@ A full-stack MERN application with AI-powered financial recommendations, investm
 - **Graceful Shutdown** — SIGTERM/SIGINT handlers with 10s timeout
 - **Persistent JWT Secret** — Secret key survives server restarts
 - **ML Service Isolation** — Flask runs on separate port, backend proxies all ML calls, no direct frontend-to-Flask communication
+- **MongoDB Connection Retry** — 3 connection attempts with 5s delay, configurable timeouts (10s selection, 45s socket), connection pooling (max 10), retry writes
+- **Connection Event Handlers** — Disconnection and error event monitoring with structured logging
+- **Troubleshooting Diagnostics** — Automatic MongoDB Atlas troubleshooting guide on connection failure (IP whitelist, cluster status, credentials, DNS)
 
 ---
 
@@ -77,6 +83,8 @@ FRONTEND
   CSS Variables, Glassmorphism, Responsive Grid, Accessibility
   CurrencyContext (7 currencies), AuthContext (session expiry)
   ML Predictions display with graceful fallback
+  Toast Notifications (in-app feedback system)
+  react-gauge-component (health score gauges), react-icons
 
 BACKEND
   Node.js, Express 4, MongoDB (Mongoose), JWT, bcrypt
@@ -84,6 +92,9 @@ BACKEND
   Helmet, Rate Limiting, Mongo Sanitize, CORS, Graceful Shutdown
   User Management (profile, password, currency preferences)
   ML Service Layer (Axios client, timeout, retry, health checks)
+  Export Service (PDFKit, ExcelJS, CSV generation)
+  Connection Retry Logic (3 attempts, 5s delay, pool config)
+  Modular Architecture (16 route files, 15 controllers, services)
 
 ML SERVICE (Python)
   Flask, Flask-CORS, NumPy
@@ -91,6 +102,10 @@ ML SERVICE (Python)
   Financial health scoring, savings/expense trend prediction
   Recommendation engine based on real user data
   Accepts monthly financial data from Express backend
+
+DEPLOYMENT
+  Vercel (serverless functions via api/index.js)
+  Concurrently (backend + frontend orchestration)
 ```
 
 ---
@@ -103,13 +118,44 @@ Smart Finance Insights/
 ├── backend/
 │   ├── index.js              # Express server + all models/routes (~2020 lines)
 │   ├── server.js             # Modular Express server with separate route files
+│   ├── reset-password.js     # CLI utility for admin password resets
+│   ├── config/
+│   │   ├── db.js             # MongoDB connection with retry logic + pooling
+│   │   └── constants.js      # Valid enums and constants
+│   ├── middleware/
+│   │   ├── auth.js           # JWT verification middleware
+│   │   ├── errorHandler.js   # Global error handler
+│   │   └── asyncHandler.js   # Async route wrapper
+│   ├── models/               # 7 Mongoose models (User, Income, Expense, Budget, Goal, Investment, Notification)
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── dashboardController.js
+│   │   ├── incomeController.js
+│   │   ├── expenseController.js
+│   │   ├── budgetController.js
+│   │   ├── goalController.js
+│   │   ├── investmentController.js
+│   │   ├── portfolioController.js
+│   │   ├── analyticsController.js
+│   │   ├── notificationController.js
+│   │   ├── userController.js
+│   │   ├── mlController.js
+│   │   ├── reportController.js
+│   │   ├── jarvisController.js
+│   │   └── exportController.js  # PDF (PDFKit), CSV, Excel (ExcelJS) generation
+│   ├── routes/               # 16 route modules
+│   │   ├── auth.js, dashboard.js, income.js, expenses.js
+│   │   ├── budget.js, goals.js, investments.js, portfolio.js
+│   │   ├── analytics.js, notifications.js, user.js
+│   │   ├── ml.js, settings.js, reportRoutes.js
+│   │   ├── jarvisRoutes.js, export.js
 │   ├── services/
 │   │   ├── mlService.js      # ML service client (Axios, timeout, retry, health checks)
 │   │   └── reportService.js  # Report generation service (MongoDB aggregation)
-│   ├── controllers/
-│   │   └── reportController.js # Report API handlers
-│   ├── routes/
-│   │   └── reportRoutes.js   # Report API route definitions
+│   ├── utils/
+│   │   ├── dateParser.js     # Date parsing utilities
+│   │   └── helpers.js        # General helper functions
+│   ├── validators/           # Input validation schemas
 │   ├── package.json
 │   └── .env                  # Environment variables
 │
@@ -128,7 +174,7 @@ Smart Finance Insights/
 │   │   │   └── FinancialHealthContext.js   # Global financial health score provider
 │   │   │
 │   │   ├── services/
-│   │   │   └── api.js           # Axios interceptors + API methods + userAPI + session utils
+│   │   │   └── api.js           # Axios interceptors + API methods + export API + session utils
 │   │   │
 │   │   ├── components/
 │   │   │   ├── Layout.js        # Sidebar + topbar + notification bell drawer + avatar
@@ -144,7 +190,8 @@ Smart Finance Insights/
 │   │   │       ├── ProgressRing.js   # SVG circular progress
 │   │   │       ├── SemiCircleGauge.js# Gauge for scores
 │   │   │       ├── EmptyState.js     # Placeholder component
-│   │   │       └── LoadingSpinner.js # Animated loader
+│   │   │       ├── LoadingSpinner.js # Animated loader
+│   │   │       └── Toast.js          # Toast notification system
 │   │   │
 │   │   ├── pages/
 │   │   │   ├── Landing.js               # / — Public marketing page
@@ -165,7 +212,7 @@ Smart Finance Insights/
 │   │   │   ├── AIInsights.js            # /ai-insights — Recommendations
 │   │   │   ├── Notifications.js         # /notifications — Standalone notifications page
 │   │   │   ├── Profile.js               # /profile — Account info + picture upload
-│   │   │   └── Settings.js              # /settings — Theme + password + currency + data
+│   │   │   └── Settings.js              # /settings — Theme + password + currency + Export Center + data
 │   │   │
 │   │   └── utils/
 │   │       ├── formatters.js      # Currency/date formatting (fmt, fmtDate, etc.)
@@ -178,6 +225,9 @@ Smart Finance Insights/
 │   ├── app.py                # Flask ML service (financial predictions + analysis)
 │   ├── requirements.txt      # Python dependencies (flask, flask-cors, numpy)
 │   └── venv/                 # Virtual environment
+│
+├── api/
+│   └── index.js              # Vercel serverless function wrapper
 │
 ├── package.json              # Root scripts (concurrently)
 └── README.md
@@ -233,6 +283,16 @@ python -m venv venv
 venv\Scripts\activate       # Windows
 pip install -r requirements.txt
 python app.py              # Runs on port 5000
+```
+
+### 5. (Optional) Password Reset Utility
+
+For emergency password resets (admin use), run the reset-password script directly:
+
+```bash
+cd backend
+node reset-password.js <email> <new-password>
+# Example: node reset-password.js test@example.com myNewPass123
 ```
 
 ---
@@ -403,6 +463,29 @@ React Frontend → Express Backend → Flask ML Service → Response → Fronten
 |--------|----------|-------------|
 | `DELETE` | `/api/clear-data` | Clear all user data (income, expenses, budgets, goals, investments, notifications) |
 
+### Data Export
+
+The Export Center in the Settings page provides unified data export with PDF, CSV, and Excel (XLSX) support.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/export/expenses/pdf` | Export expenses as PDF |
+| `GET` | `/api/export/expenses/csv` | Export expenses as CSV |
+| `GET` | `/api/export/expenses/xlsx` | Export expenses as Excel |
+| `GET` | `/api/export/investments/pdf` | Export investments as PDF |
+| `GET` | `/api/export/investments/csv` | Export investments as CSV |
+| `GET` | `/api/export/investments/excel` | Export investments as Excel |
+| `GET` | `/api/export/financial-report/pdf` | Export full financial summary as PDF |
+| `GET` | `/api/export/financial-report/csv` | Export full financial summary as CSV |
+| `GET` | `/api/export/financial-report/xlsx` | Export full financial summary as Excel |
+| `GET` | `/api/export/goals/pdf` | Export goals as PDF |
+| `GET` | `/api/export/goals/csv` | Export goals as CSV |
+| `GET` | `/api/export/goals/xlsx` | Export goals as Excel |
+| `GET` | `/api/export/comprehensive/csv` | Export all data (income, expenses, budgets, goals, investments) as combined CSV |
+
+**Export Report Types:** `expenses`, `investments`, `financial-report`, `goals`, `comprehensive`
+**Export Formats:** `pdf`, `csv`, `xlsx` (availability varies by report type)
+
 ### Advanced Financial Reports (Milestone 4)
 
 The Reports page has been upgraded to a complete **Advanced Financial Reporting Center** with 4 report types, export capabilities, and an integrated JARVIS AI assistant.
@@ -423,12 +506,12 @@ The Reports page has been upgraded to a complete **Advanced Financial Reporting 
 | `GET` | `/api/reports/goal-progress` | — | Generate goal progress report |
 | `GET` | `/api/reports/export/csv` | `type, month` | Export report as CSV file |
 | `GET` | `/api/reports/export/pdf` | `type, month` | Export report as printable HTML |
-| `POST` | `/api/reports/jarvis` | `{ query }` | Ask JARVIS financial assistant |
+| `POST` | `/api/jarvis/chat` | `{ message }` | Ask JARVIS financial assistant |
 
 **Export Types:** `monthly-expenses`, `budget-utilization`, `investment-performance`, `goal-progress`
 
 **JARVIS Financial Assistant:**
-An interactive chatbot widget integrated into the Reports page that answers financial questions using existing data. Supports queries like:
+An interactive chatbot widget available as both a standalone floating button and an embedded panel in the Reports page. Answers financial questions using existing backend data. Supports queries like:
 - "How much did I spend this month?"
 - "Show my budget status"
 - "What is my savings rate?"
@@ -438,6 +521,7 @@ An interactive chatbot widget integrated into the Reports page that answers fina
 - "Generate my monthly expense summary"
 
 JARVIS uses rule-based logic with existing backend data — no external AI service required.
+API Endpoint: `POST /api/jarvis/chat` with `{ message }` body.
 
 **Frontend Components:**
 - `JARVISAssistant.js` — Reusable chatbot widget (standalone floating button or embedded panel)
@@ -598,6 +682,7 @@ LoadingSpinner → Animated pulse spinner
 SemiCircleGauge → Gauge for health scores
 ErrorBoundary → React error boundary with fallback UI
 Modal        → Backdrop blur + fade/slide animation (password, currency)
+Toast        → In-app notification toasts (success/error) with auto-dismiss
 ```
 
 ### Animations
@@ -662,6 +747,9 @@ cd frontend && npm run build
 
 # Run tests
 cd frontend && npm test
+
+# Reset user password (admin utility)
+cd backend && node reset-password.js <email> <new-password>
 ```
 
 ---
