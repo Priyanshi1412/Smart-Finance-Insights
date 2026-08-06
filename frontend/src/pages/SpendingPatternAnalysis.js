@@ -67,6 +67,17 @@ export default function SpendingPatternAnalysis() {
     return () => { mounted = false; };
   }, [navigate]);
 
+  useEffect(() => {
+    const handleImport = () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      analyticsAPI.getSpendingPatterns().then(res => setSpending(res.data)).catch(() => {});
+      expenseAPI.getAll().then(res => setExpenses(res.data || [])).catch(() => {});
+    };
+    window.addEventListener('sfi-data-imported', handleImport);
+    return () => window.removeEventListener('sfi-data-imported', handleImport);
+  }, []);
+
   const monthlyData12 = useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();

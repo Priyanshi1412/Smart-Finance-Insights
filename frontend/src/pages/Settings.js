@@ -6,8 +6,8 @@ import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Icon, { icons } from '../components/Icon';
-import { incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, settingsAPI, userAPI, exportAPI, feedbackAPI } from '../services/api';
-import { useState, useEffect } from 'react';
+import { incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, settingsAPI, userAPI, exportAPI, importAPI, feedbackAPI } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
 import ToastContainer, { showToast } from '../components/ui/Toast';
 
 const fadeInUp = { animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 };
@@ -364,6 +364,162 @@ export default function Settings() {
       showToast('Failed to clear data', 'error');
     } finally {
       setClearing(false);
+    }
+  };
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importStep, setImportStep] = useState(1);
+  const [importFile, setImportFile] = useState(null);
+  const [importFileType, setImportFileType] = useState('');
+  const [importDatasetType, setImportDatasetType] = useState('');
+  const [importPreview, setImportPreview] = useState([]);
+  const [importAllRows, setImportAllRows] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const resetImport = () => {
+    setImportStep(1);
+    setImportFile(null);
+    setImportFileType('');
+    setImportDatasetType('');
+    setImportPreview([]);
+    setImportAllRows([]);
+    setImportErrors([]);
+    setImporting(false);
+    setImportResult(null);
+  };
+
+  const handleImportFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['csv', 'xlsx', 'xls'].includes(ext)) {
+      showToast('Unsupported file type. Use CSV or XLSX.', 'error');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size must be under 10MB', 'error');
+      return;
+    }
+    setImportFile(file);
+    setImportFileType(ext);
+  };
+
+  const parseCSVFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const Papa = require('papaparse');
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.errors.length > 0) {
+            reject(new Error('CSV parsing error: ' + results.errors[0].message));
+          }
+          resolve(results.data);
+        },
+        error: (err) => reject(err),
+      });
+    });
+  };
+
+  const parseExcelFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const XLSX = require('xlsx');
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+          resolve(jsonData);
+        } catch (err) {
+          reject(new Error('Failed to parse Excel file. It may be corrupted.'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleImportNext = async () => {
+    if (importStep === 1 && importFile && importDatasetType) {
+      setImportStep(3);
+    } else if (importStep === 2 && importDatasetType) {
+      setImportStep(3);
+    } else if (importStep === 3) {
+      if (!importFile) return;
+      try {
+        let rows;
+        if (importFileType === 'csv') {
+          rows = await parseCSVFile(importFile);
+        } else {
+          rows = await parseExcelFile(importFile);
+        }
+        if (!rows || rows.length === 0) {
+          showToast('File is empty or has no data rows', 'error');
+          return;
+        }
+        const normalizedRows = rows.map(r => {
+          const row = {};
+          Object.keys(r).forEach(k => {
+            row[k.trim().toLowerCase().replace(/\s+/g, '')] = r[k];
+          });
+          return row;
+        });
+        setImportAllRows(normalizedRows);
+        setImportPreview(normalizedRows.slice(0, 10));
+        setImportErrors([]);
+        setImportStep(4);
+      } catch (err) {
+        showToast(err.message || 'Failed to parse file', 'error');
+      }
+    } else if (importStep === 4) {
+      setImportStep(5);
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    setImporting(true);
+    setImportErrors([]);
+    try {
+      const apiCall = importDatasetType === 'expense'
+        ? importAPI.importExpenses(importAllRows)
+        : importAPI.importIncome(importAllRows);
+      const res = await apiCall;
+      const data = res.data;
+      if (data.success) {
+        setImportResult(data);
+        showToast(`${data.imported} ${importDatasetType} transactions imported successfully.`);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('sfi-data-imported'));
+        }, 100);
+      } else {
+        setImportErrors(data.errors || ['Import failed']);
+        setImportResult(data);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Import failed. Please try again.';
+      showToast(msg, 'error');
+      setImportErrors([msg]);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = async (type) => {
+    try {
+      const res = type === 'expense'
+        ? await importAPI.downloadExpenseTemplate()
+        : await importAPI.downloadIncomeTemplate();
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      downloadBlob(blob, `${type}-template.csv`);
+      showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} template downloaded`);
+    } catch (err) {
+      showToast('Failed to download template', 'error');
     }
   };
 
@@ -1006,6 +1162,438 @@ export default function Settings() {
             justify-content: center;
           }
         }
+
+        .import-card-wrap {
+          background: linear-gradient(135deg, rgba(17,24,39,0.55) 0%, rgba(15,23,42,0.4) 100%);
+          border: 1px solid rgba(59,130,246,0.12);
+          border-radius: 20px;
+          padding: 28px;
+          backdrop-filter: blur(14px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+        .import-card-wrap::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 10%, rgba(59,130,246,0.2) 50%, transparent 90%);
+        }
+        .import-card-wrap:hover {
+          border-color: rgba(59,130,246,0.22);
+          box-shadow: 0 8px 40px rgba(59,130,246,0.08);
+        }
+        [data-theme="light"] .import-card-wrap {
+          background: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(248,250,252,0.8) 100%);
+        }
+        .import-card-header {
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+        .import-card-icon {
+          width: 52px;
+          height: 52px;
+          min-width: 52px;
+          border-radius: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(20,184,166,0.12));
+          border: 1px solid rgba(59,130,246,0.15);
+          box-shadow: 0 0 24px rgba(59,130,246,0.1);
+        }
+        .import-card-title {
+          font-weight: 800;
+          color: var(--text-primary);
+          font-size: 1.05rem;
+          line-height: 1.3;
+          margin-bottom: 4px;
+        }
+        .import-card-desc {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          line-height: 1.5;
+        }
+        .import-format-chips {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+        .import-chip {
+          padding: 5px 12px;
+          border-radius: 8px;
+          font-size: 0.72rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          border: 1px solid rgba(148,163,184,0.15);
+          background: rgba(255,255,255,0.04);
+          color: var(--text-muted);
+        }
+        .import-chip.active {
+          border-color: rgba(59,130,246,0.3);
+          background: rgba(59,130,246,0.08);
+          color: var(--accent);
+        }
+        .import-card-actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .import-btn-secondary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 11px 20px;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+          background: rgba(255,255,255,0.03);
+          color: var(--text-muted);
+          font-weight: 600;
+          font-size: 0.82rem;
+          cursor: pointer;
+          transition: all 0.25s ease;
+        }
+        .import-btn-secondary:hover {
+          border-color: var(--text-muted);
+          color: var(--text-primary);
+          background: rgba(255,255,255,0.06);
+        }
+        [data-theme="light"] .import-btn-secondary:hover {
+          background: rgba(0,0,0,0.04);
+        }
+        .import-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 11px 24px;
+          border-radius: 12px;
+          border: 1px solid var(--accent);
+          background: rgba(59,130,246,0.08);
+          color: var(--accent);
+          font-weight: 700;
+          font-size: 0.82rem;
+          cursor: pointer;
+          transition: all 0.25s ease;
+        }
+        .import-btn-primary:hover:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+          box-shadow: 0 6px 24px rgba(59,130,246,0.3);
+          transform: translateY(-2px);
+        }
+        .import-btn-primary:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        [data-theme="light"] .import-btn-primary {
+          background: rgba(37,99,235,0.06);
+        }
+        [data-theme="light"] .import-btn-primary:hover:not(:disabled) {
+          background: var(--accent);
+          color: #fff;
+        }
+
+        .import-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0,0,0,0.6);
+          backdrop-filter: blur(6px);
+          animation: modalFadeIn 0.2s ease-out;
+        }
+        .import-modal {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: 24px;
+          width: 94%;
+          max-width: 580px;
+          max-height: 90vh;
+          overflow: hidden;
+          box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+          animation: modalSlideIn 0.25s ease-out;
+          display: flex;
+          flex-direction: column;
+        }
+        .import-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 24px;
+          border-bottom: 1px solid var(--border-light);
+        }
+        .import-modal-title {
+          font-weight: 700;
+          font-size: 1rem;
+          color: var(--text-primary);
+        }
+        .import-modal-close {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          font-size: 1.1rem;
+        }
+        .import-modal-close:hover {
+          background: rgba(239,68,68,0.1);
+          border-color: rgba(239,68,68,0.2);
+          color: var(--danger-light);
+        }
+        .import-modal-body {
+          padding: 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+        .import-modal-footer {
+          padding: 16px 24px;
+          border-top: 1px solid var(--border-light);
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+        .import-step-indicator {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 24px;
+        }
+        .import-step-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--border);
+          transition: all 0.3s;
+        }
+        .import-step-dot.active {
+          background: var(--accent);
+          box-shadow: 0 0 12px rgba(59,130,246,0.4);
+          width: 10px;
+          height: 10px;
+        }
+        .import-step-dot.done {
+          background: var(--success);
+        }
+        .import-step-line {
+          width: 24px;
+          height: 2px;
+          background: var(--border);
+          border-radius: 1px;
+        }
+        .import-step-line.done {
+          background: var(--success);
+        }
+        .import-drop-zone {
+          border: 2px dashed rgba(59,130,246,0.25);
+          border-radius: 16px;
+          padding: 40px 24px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.3s;
+          background: rgba(59,130,246,0.03);
+        }
+        .import-drop-zone:hover {
+          border-color: rgba(59,130,246,0.4);
+          background: rgba(59,130,246,0.06);
+        }
+        .import-drop-zone.has-file {
+          border-color: rgba(16,185,129,0.3);
+          background: rgba(16,185,129,0.04);
+        }
+        .import-file-info {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 14px 16px;
+          border-radius: 12px;
+          background: rgba(16,185,129,0.06);
+          border: 1px solid rgba(16,185,129,0.15);
+          margin-top: 16px;
+        }
+        .import-dataset-options {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        .import-dataset-option {
+          padding: 20px 16px;
+          border-radius: 14px;
+          border: 2px solid var(--border);
+          background: transparent;
+          cursor: pointer;
+          text-align: center;
+          transition: all 0.25s;
+          color: var(--text-muted);
+        }
+        .import-dataset-option:hover {
+          border-color: rgba(59,130,246,0.3);
+          background: rgba(59,130,246,0.04);
+        }
+        .import-dataset-option.selected {
+          border-color: var(--accent);
+          background: rgba(59,130,246,0.08);
+          color: var(--accent);
+          box-shadow: 0 0 20px rgba(59,130,246,0.1);
+        }
+        .import-dataset-option-icon {
+          width: 44px;
+          height: 44px;
+          margin: 0 auto 10px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .import-dataset-option-title {
+          font-weight: 700;
+          font-size: 0.88rem;
+          margin-bottom: 4px;
+        }
+        .import-dataset-option-desc {
+          font-size: 0.74rem;
+          opacity: 0.7;
+        }
+        .import-preview-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.78rem;
+        }
+        .import-preview-table th {
+          text-align: left;
+          padding: 10px 12px;
+          background: rgba(59,130,246,0.06);
+          border-bottom: 1px solid var(--border);
+          color: var(--text-muted);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          font-size: 0.7rem;
+          white-space: nowrap;
+        }
+        .import-preview-table td {
+          padding: 8px 12px;
+          border-bottom: 1px solid var(--border-light);
+          color: var(--text-primary);
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .import-preview-table tr:hover td {
+          background: rgba(59,130,246,0.03);
+        }
+        .import-validation-list {
+          max-height: 180px;
+          overflow-y: auto;
+          border: 1px solid rgba(239,68,68,0.15);
+          border-radius: 10px;
+          padding: 12px;
+          background: rgba(239,68,68,0.04);
+        }
+        .import-validation-item {
+          font-size: 0.78rem;
+          color: var(--danger-light);
+          padding: 4px 0;
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          line-height: 1.4;
+        }
+        .import-validation-item::before {
+          content: '';
+          width: 4px;
+          height: 4px;
+          min-width: 4px;
+          border-radius: 50%;
+          background: var(--danger);
+          margin-top: 6px;
+        }
+        .import-success-card {
+          text-align: center;
+          padding: 32px 16px;
+        }
+        .import-success-icon {
+          width: 64px;
+          height: 64px;
+          margin: 0 auto 16px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(16,185,129,0.1);
+          border: 2px solid rgba(16,185,129,0.2);
+          box-shadow: 0 0 32px rgba(16,185,129,0.15);
+        }
+        .import-success-title {
+          font-weight: 700;
+          font-size: 1.1rem;
+          color: var(--text-primary);
+          margin-bottom: 8px;
+        }
+        .import-success-desc {
+          font-size: 0.82rem;
+          color: var(--text-muted);
+          line-height: 1.5;
+        }
+        .import-loading-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          backdrop-filter: blur(4px);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          z-index: 10;
+          border-radius: 24px;
+        }
+        @keyframes importSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .import-spinner {
+          width: 36px;
+          height: 36px;
+          border: 3px solid rgba(59,130,246,0.2);
+          border-top-color: var(--accent);
+          border-radius: 50%;
+          animation: importSpin 0.8s linear infinite;
+        }
+        @media (max-width: 680px) {
+          .import-card-wrap {
+            padding: 20px;
+          }
+          .import-card-actions {
+            flex-direction: column;
+          }
+          .import-btn-secondary, .import-btn-primary {
+            width: 100%;
+          }
+          .import-dataset-options {
+            grid-template-columns: 1fr;
+          }
+          .import-modal {
+            width: 98%;
+            max-height: 95vh;
+          }
+        }
       `}</style>
 
       <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1193,7 +1781,7 @@ export default function Settings() {
               </div>
               <div>
                 <div className="export-section-title">Data & Export Center</div>
-                <div className="export-section-subtitle">Export your financial data in multiple formats</div>
+                <div className="export-section-subtitle">Import and export your financial data in multiple formats</div>
               </div>
             </div>
 
@@ -1443,6 +2031,42 @@ export default function Settings() {
                 </button>
               </div>
 
+            </div>
+
+            {/* Import Financial Data */}
+            <div style={{ marginTop: '20px' }}>
+              <div className="import-card-wrap">
+                <div className="import-card-header">
+                  <div className="import-card-icon">
+                    <Icon path={icons.upload} size={24} />
+                  </div>
+                  <div>
+                    <div className="import-card-title">Import Financial Data</div>
+                    <div className="import-card-desc">
+                      Upload CSV or Excel transaction datasets to automatically add income and expense records to your Smart Finance Insights account.
+                    </div>
+                  </div>
+                </div>
+                <div className="import-format-chips">
+                  <span className="import-chip active">CSV</span>
+                  <span className="import-chip active">XLSX</span>
+                  <span className="import-chip active">Auto Validation</span>
+                </div>
+                <div className="import-card-actions">
+                  <button className="import-btn-secondary" onClick={() => handleDownloadTemplate(importDatasetType || 'expense')}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Sample Template
+                  </button>
+                  <button className="import-btn-primary" onClick={() => { resetImport(); setImportOpen(true); }}>
+                    <Icon path={icons.upload} size={14} />
+                    Import Dataset
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Danger Zone */}
@@ -1980,6 +2604,297 @@ export default function Settings() {
           </form>
         </div>
       </Modal>
+
+      {/* Import Modal */}
+      {importOpen && (
+        <div className="import-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setImportOpen(false); resetImport(); } }}>
+          <div className="import-modal" style={{ position: 'relative' }}>
+            {importing && (
+              <div className="import-loading-overlay">
+                <div className="import-spinner" />
+                <div style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>Importing data...</div>
+              </div>
+            )}
+            <div className="import-modal-header">
+              <div className="import-modal-title">
+                {importStep === 5 && importResult?.success ? 'Import Complete' : 'Import Financial Data'}
+              </div>
+              <button className="import-modal-close" onClick={() => { setImportOpen(false); resetImport(); }}>
+                &times;
+              </button>
+            </div>
+
+            <div className="import-modal-body">
+              {/* Step Indicator */}
+              <div className="import-step-indicator">
+                {[1, 2, 3, 4, 5].map(s => (
+                  <>
+                    <div key={s} className={`import-step-dot ${importStep === s ? 'active' : importStep > s ? 'done' : ''}`} />
+                    {s < 5 && <div key={`line-${s}`} className={`import-step-line ${importStep > s ? 'done' : ''}`} />}
+                  </>
+                ))}
+              </div>
+
+              {/* Step 1: Choose File */}
+              {importStep === 1 && (
+                <div>
+                  <div style={{ textAlign: 'center', marginBottom: 16, fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                    Select a file to import
+                  </div>
+                  <div
+                    className={`import-drop-zone ${importFile ? 'has-file' : ''}`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      style={{ display: 'none' }}
+                      onChange={handleImportFileSelect}
+                    />
+                    {importFile ? (
+                      <>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" style={{ margin: '0 auto 12px' }}>
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                          <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem', marginBottom: 4 }}>
+                          {importFile.name}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {(importFile.size / 1024).toFixed(1)} KB &middot; {importFileType.toUpperCase()} file
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--accent)', marginTop: 8, cursor: 'pointer' }}>
+                          Click to change file
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" style={{ margin: '0 auto 12px', opacity: 0.6 }}>
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem', marginBottom: 4 }}>
+                          Click to browse files
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          Supports CSV and XLSX files up to 10MB
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Select Dataset Type */}
+              {importStep === 2 && (
+                <div>
+                  <div style={{ textAlign: 'center', marginBottom: 20, fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                    What type of data are you importing?
+                  </div>
+                  <div className="import-dataset-options">
+                    <button
+                      className={`import-dataset-option ${importDatasetType === 'expense' ? 'selected' : ''}`}
+                      onClick={() => setImportDatasetType('expense')}
+                    >
+                      <div className="import-dataset-option-icon" style={{ background: 'rgba(244,63,94,0.12)' }}>
+                        <Icon path={icons.expenses} size={22} />
+                      </div>
+                      <div className="import-dataset-option-title">Expense Dataset</div>
+                      <div className="import-dataset-option-desc">Import expense transactions with categories</div>
+                    </button>
+                    <button
+                      className={`import-dataset-option ${importDatasetType === 'income' ? 'selected' : ''}`}
+                      onClick={() => setImportDatasetType('income')}
+                    >
+                      <div className="import-dataset-option-icon" style={{ background: 'rgba(16,185,129,0.12)' }}>
+                        <Icon path={icons.income} size={22} />
+                      </div>
+                      <div className="import-dataset-option-title">Income Dataset</div>
+                      <div className="import-dataset-option-desc">Import income records with sources</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Upload & Parse */}
+              {importStep === 3 && (
+                <div>
+                  <div style={{ textAlign: 'center', marginBottom: 16, fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+                    Ready to parse your file
+                  </div>
+                  <div style={{
+                    padding: 20, borderRadius: 14, background: 'rgba(59,130,246,0.06)',
+                    border: '1px solid rgba(59,130,246,0.12)', textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginBottom: 8, fontWeight: 600 }}>
+                      {importFile?.name}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+                      {importFileType.toUpperCase()} &middot; {(importFile?.size / 1024).toFixed(1)} KB
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--accent)' }}>
+                      {importDatasetType === 'expense' ? 'Expense' : 'Income'} Dataset
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 16, fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
+                    Click <strong>Next</strong> to parse and preview your data. Required columns for {importDatasetType}:
+                    <br />
+                    {importDatasetType === 'expense'
+                      ? <span style={{ color: 'var(--text-primary)' }}>date, amount, category, description</span>
+                      : <span style={{ color: 'var(--text-primary)' }}>date, amount, source, description</span>
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Preview Data */}
+              {importStep === 4 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                      Data Preview ({importAllRows.length} rows)
+                    </div>
+                    {importPreview.length > 0 && (
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        Showing first {importPreview.length} rows
+                      </div>
+                    )}
+                  </div>
+
+                  {importPreview.length > 0 ? (
+                    <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border)' }}>
+                      <table className="import-preview-table">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            {Object.keys(importPreview[0]).map(k => (
+                              <th key={k}>{k}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.map((row, i) => (
+                            <tr key={i}>
+                              <td style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{i + 1}</td>
+                              {Object.keys(importPreview[0]).map(k => (
+                                <td key={k}>{row[k] != null ? String(row[k]) : ''}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      No data found in the file
+                    </div>
+                  )}
+
+                  {importErrors.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--danger-light)', fontSize: '0.82rem', marginBottom: 8 }}>
+                        Validation Errors ({importErrors.length})
+                      </div>
+                      <div className="import-validation-list">
+                        {importErrors.map((err, i) => (
+                          <div key={i} className="import-validation-item">{err}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 5: Result */}
+              {importStep === 5 && (
+                <div className="import-success-card">
+                  {importResult?.success ? (
+                    <>
+                      <div className="import-success-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                      <div className="import-success-title">Import Successful!</div>
+                      <div className="import-success-desc">
+                        <strong>{importResult.imported}</strong> {importDatasetType} transactions imported successfully.
+                        {importResult.failed > 0 && (
+                          <div style={{ marginTop: 8, color: 'var(--danger-light)' }}>
+                            {importResult.failed} rows failed validation.
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ marginTop: 16, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Dashboard, reports, and analytics will refresh automatically.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="import-success-icon" style={{ borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.1)' }}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
+                        </svg>
+                      </div>
+                      <div className="import-success-title" style={{ color: 'var(--danger-light)' }}>Import Failed</div>
+                      <div className="import-success-desc">
+                        {importErrors.length > 0 ? (
+                          <div className="import-validation-list" style={{ textAlign: 'left', marginTop: 12 }}>
+                            {importErrors.map((err, i) => (
+                              <div key={i} className="import-validation-item">{err}</div>
+                            ))}
+                          </div>
+                        ) : (
+                          'An error occurred during import. Please check your data and try again.'
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="import-modal-footer">
+              {importStep > 1 && importStep < 5 && (
+                <button className="import-btn-secondary" onClick={() => setImportStep(s => s - 1)}>
+                  Back
+                </button>
+              )}
+              {importStep < 4 && (
+                <button
+                  className="import-btn-primary"
+                  onClick={handleImportNext}
+                  disabled={(importStep === 1 && !importFile) || (importStep === 2 && !importDatasetType)}
+                >
+                  Next
+                </button>
+              )}
+              {importStep === 4 && (
+                <button
+                  className="import-btn-primary"
+                  onClick={handleImportNext}
+                  disabled={importAllRows.length === 0}
+                >
+                  Review & Import ({importAllRows.length} rows)
+                </button>
+              )}
+              {importStep === 5 && !importResult?.success && (
+                <button className="import-btn-primary" onClick={() => { resetImport(); setImportStep(1); }}>
+                  Try Again
+                </button>
+              )}
+              {importStep === 5 && importResult?.success && (
+                <button className="import-btn-primary" onClick={() => { setImportOpen(false); resetImport(); }}>
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </Layout>
     <ToastContainer />

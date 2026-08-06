@@ -183,6 +183,13 @@ export const exportAPI = {
   comprehensiveCSV: () => api.get('/api/export/comprehensive/csv', { responseType: 'blob' }),
 };
 
+export const importAPI = {
+  importExpenses: (rows) => api.post('/api/import/expenses', { rows }),
+  importIncome: (rows) => api.post('/api/import/income', { rows }),
+  downloadExpenseTemplate: () => api.get('/api/import/template/expenses', { responseType: 'blob' }),
+  downloadIncomeTemplate: () => api.get('/api/import/template/income', { responseType: 'blob' }),
+};
+
 export const feedbackAPI = {
   submit: (data) => api.post('/api/feedback', data),
 };

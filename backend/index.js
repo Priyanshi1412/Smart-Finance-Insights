@@ -11,6 +11,7 @@ const mlService = require('./services/mlService');
 const jarvisRoutes = require('./routes/jarvisRoutes');
 const exportRoutes = require('./routes/export');
 const reportRoutes = require('./routes/reportRoutes');
+const importRoutes = require('./routes/import');
 
 const app = express();
 
@@ -2040,6 +2041,9 @@ async function startServer() {
 
     // Export routes
     app.use('/api/export', exportRoutes);
+
+    // Import routes
+    app.use('/api/import', importRoutes);
 
     // Feedback routes
     const feedbackRoutes = require('./routes/feedback');

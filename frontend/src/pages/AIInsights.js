@@ -104,7 +104,8 @@ export default function AIInsights() {
     load();
     interval = setInterval(load, 30000);
     window.addEventListener('focus', load);
-    return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', load); };
+    window.addEventListener('sfi-data-imported', load);
+    return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', load); window.removeEventListener('sfi-data-imported', load); };
   }, [navigate]);
 
   const computed = useMemo(() => {

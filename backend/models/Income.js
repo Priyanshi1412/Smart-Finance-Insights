@@ -5,7 +5,8 @@ const incomeSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   source: { type: String, required: true },
   date: { type: Date, default: Date.now },
-  description: { type: String }
+  description: { type: String },
+  category: { type: String, default: '' }
 });
 incomeSchema.index({ userId: 1, date: -1 });
 

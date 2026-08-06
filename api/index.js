@@ -78,6 +78,7 @@ const settingsRoutes = require('../backend/routes/settings');
 const reportRoutes = require('../backend/routes/reportRoutes');
 const jarvisRoutes = require('../backend/routes/jarvisRoutes');
 const exportRoutes = require('../backend/routes/export');
+const importRoutes = require('../backend/routes/import');
 
 app.use('/api', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -94,6 +95,7 @@ app.use('/api/ml', mlRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/jarvis', jarvisRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/import', importRoutes);
 app.use('/api', settingsRoutes);
 
 const errorHandler = require('../backend/middleware/errorHandler');

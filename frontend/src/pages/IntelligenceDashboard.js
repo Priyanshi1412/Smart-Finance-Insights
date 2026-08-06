@@ -135,7 +135,8 @@ export default function IntelligenceDashboard() {
 
     loadAll();
     const interval = setInterval(loadAll, 30000);
-    return () => { mounted = false; clearInterval(interval); };
+    window.addEventListener('sfi-data-imported', loadAll);
+    return () => { mounted = false; clearInterval(interval); window.removeEventListener('sfi-data-imported', loadAll); };
   }, [navigate]);
 
   const expenseByCategory = useMemo(() => {

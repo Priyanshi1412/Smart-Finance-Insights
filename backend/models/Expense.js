@@ -5,7 +5,8 @@ const expenseSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   category: { type: String, required: true },
   date: { type: Date, default: Date.now },
-  description: { type: String }
+  description: { type: String },
+  paymentMethod: { type: String, default: '' }
 });
 expenseSchema.index({ userId: 1, date: -1 });
 

@@ -216,9 +216,11 @@ export default function Dashboard() {
     let mounted = true;
     const interval = setInterval(() => { if (mounted) loadDashboard(); }, 30000);
     const handleFocus = () => { if (mounted) loadDashboard(); };
+    const handleImport = () => { if (mounted) loadDashboard(); };
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('sfi-data-imported', handleImport);
     loadDashboard();
-    return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', handleFocus); };
+    return () => { mounted = false; clearInterval(interval); window.removeEventListener('focus', handleFocus); window.removeEventListener('sfi-data-imported', handleImport); };
   }, [loadDashboard]);
 
   const barChartData = useMemo(() => {
