@@ -6,7 +6,7 @@ import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Icon, { icons } from '../components/Icon';
-import { incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, settingsAPI, userAPI, exportAPI } from '../services/api';
+import { incomeAPI, expenseAPI, budgetAPI, goalAPI, investmentAPI, settingsAPI, userAPI, exportAPI, feedbackAPI } from '../services/api';
 import { useState, useEffect } from 'react';
 import ToastContainer, { showToast } from '../components/ui/Toast';
 
@@ -118,7 +118,52 @@ export default function Settings() {
   const [curLoading, setCurLoading] = useState(false);
   const [curMsg, setCurMsg] = useState({ type: '', text: '' });
 
+  const [fbOpen, setFbOpen] = useState(false);
+  const [fbCategory, setFbCategory] = useState('General Feedback');
+  const [fbRating, setFbRating] = useState(0);
+  const [fbHoverRating, setFbHoverRating] = useState(0);
+  const [fbMessage, setFbMessage] = useState('');
+  const [fbEmail, setFbEmail] = useState('');
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbMsg, setFbMsg] = useState({ type: '', text: '' });
+
   useEffect(() => { setSelectedCurrency(currency); }, [currency]);
+
+  const resetFb = () => {
+    setFbCategory('General Feedback');
+    setFbRating(0);
+    setFbHoverRating(0);
+    setFbMessage('');
+    setFbEmail('');
+    setFbMsg({ type: '', text: '' });
+  };
+
+  const handleFbSubmit = async (e) => {
+    e.preventDefault();
+    setFbMsg({ type: '', text: '' });
+    if (fbRating < 1) {
+      setFbMsg({ type: 'error', text: 'Please select a rating' }); return;
+    }
+    if (!fbMessage.trim() || fbMessage.trim().length < 3) {
+      setFbMsg({ type: 'error', text: 'Message must be at least 3 characters' }); return;
+    }
+    setFbLoading(true);
+    try {
+      await feedbackAPI.submit({
+        category: fbCategory,
+        rating: fbRating,
+        message: fbMessage.trim(),
+        email: fbEmail.trim(),
+      });
+      setFbMsg({ type: 'success', text: 'Thank you! Your feedback has been submitted.' });
+      resetFb();
+      setTimeout(() => { setFbOpen(false); setFbMsg({ type: '', text: '' }); }, 1800);
+    } catch (err) {
+      setFbMsg({ type: 'error', text: err.response?.data?.error || 'Failed to submit feedback' });
+    } finally {
+      setFbLoading(false);
+    }
+  };
 
   const resetPw = () => {
     setCurrentPassword('');
@@ -414,6 +459,121 @@ export default function Settings() {
         .cur-opt.active { border-color: var(--accent); background: rgba(59,130,246,0.06);
           box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        .help-tile {
+          background: linear-gradient(135deg, rgba(17,24,39,0.55) 0%, rgba(15,23,42,0.4) 100%);
+          border: 1px solid rgba(148,163,184,0.12);
+          border-radius: 18px;
+          padding: 24px 20px;
+          backdrop-filter: blur(14px);
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+        }
+        .help-tile::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 10%, rgba(148,163,184,0.1) 50%, transparent 90%);
+        }
+        .help-tile:hover {
+          border-color: rgba(59,130,246,0.2);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 32px rgba(59,130,246,0.08), 0 0 0 1px rgba(59,130,246,0.06);
+        }
+        [data-theme="light"] .help-tile {
+          background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(248,250,252,0.82) 100%);
+        }
+        [data-theme="light"] .help-tile:hover {
+          border-color: rgba(37,99,235,0.15);
+        }
+        .help-tile-icon {
+          width: 48px;
+          height: 48px;
+          margin: 0 auto 14px;
+          border-radius: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.25s ease;
+        }
+        .help-tile:hover .help-tile-icon {
+          transform: scale(1.08);
+        }
+        .help-tile-title {
+          font-weight: 700;
+          color: var(--text-primary);
+          font-size: 0.92rem;
+          margin-bottom: 5px;
+        }
+        .help-tile-desc {
+          font-size: 0.76rem;
+          color: var(--text-muted);
+          line-height: 1.4;
+        }
+        .help-primary-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 14px 32px;
+          border-radius: 14px;
+          border: 1px solid var(--accent);
+          background: rgba(59,130,246,0.08);
+          color: var(--accent);
+          font-weight: 700;
+          font-size: 0.92rem;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          letter-spacing: 0.01em;
+        }
+        .help-primary-btn:hover {
+          background: var(--accent);
+          color: #fff;
+          box-shadow: 0 6px 24px rgba(59,130,246,0.3);
+          transform: translateY(-2px);
+        }
+        [data-theme="light"] .help-primary-btn {
+          background: rgba(37,99,235,0.06);
+        }
+        [data-theme="light"] .help-primary-btn:hover {
+          background: var(--accent);
+          color: #fff;
+        }
+        .fb-star {
+          cursor: pointer;
+          transition: all 0.15s ease;
+          color: var(--text-muted);
+        }
+        .fb-star:hover, .fb-star.active {
+          color: #F59E0B;
+          transform: scale(1.15);
+        }
+        .fb-star.active {
+          filter: drop-shadow(0 0 4px rgba(245,158,11,0.4));
+        }
+        .fb-field {
+          width: 100%;
+          padding: 10px 14px;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          background: var(--bg-secondary);
+          color: var(--text-primary);
+          font-size: 0.85rem;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          font-family: inherit;
+        }
+        .fb-field:focus {
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+        }
+        .fb-field::placeholder {
+          color: var(--text-muted);
+          opacity: 0.6;
+        }
         .export-section-wrap {
           background: linear-gradient(145deg, rgba(11,20,38,0.78) 0%, rgba(13,27,54,0.65) 100%);
           border: 1px solid rgba(148,163,184,0.14);
@@ -1364,6 +1524,105 @@ export default function Settings() {
           </Card>
         </div>
 
+        {/* ═══ Help & Support ═══ */}
+        <div style={{ ...fadeInUp, ...stagger(5) }}>
+          <Card className="section-card" style={{ padding: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 'var(--radius-lg)',
+                background: 'linear-gradient(135deg, rgba(20,184,166,0.15), rgba(59,130,246,0.12))',
+                border: '1px solid rgba(20,184,166,0.15)',
+                boxShadow: '0 0 20px rgba(20,184,166,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon path={icons.send} size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                  Help & Support
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0', lineHeight: 1.3 }}>
+                  Share your experience, suggest improvements, or report issues to help us improve Smart Finance Insights.
+                </p>
+              </div>
+            </div>
+
+            {/* Intro Card */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(17,24,39,0.5) 0%, rgba(15,23,42,0.35) 100%)',
+              border: '1px solid rgba(148,163,184,0.1)',
+              borderRadius: '18px',
+              padding: '28px 24px',
+              backdropFilter: 'blur(12px)',
+              marginBottom: '20px',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+                background: 'linear-gradient(90deg, transparent 10%, rgba(20,184,166,0.2) 50%, transparent 90%)',
+              }} />
+              <div style={{
+                width: 52, height: 52, margin: '0 auto 14px', borderRadius: 15,
+                background: 'linear-gradient(135deg, rgba(20,184,166,0.12), rgba(59,130,246,0.1))',
+                border: '1px solid rgba(20,184,166,0.12)',
+                boxShadow: '0 0 28px rgba(20,184,166,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon path={icons.send} size={22} />
+              </div>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 6px' }}>
+                Enjoying Smart Finance Insights?
+              </h4>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: 420, margin: '0 auto', lineHeight: 1.5 }}>
+                Your feedback helps us build better features, fix issues, and create a smoother experience for everyone.
+              </p>
+            </div>
+
+            {/* Quick Action Tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+              <div className="help-tile" onClick={() => { resetFb(); setFbRating(3); setFbOpen(true); }}>
+                <div className="help-tile-icon" style={{
+                  background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.12)',
+                }}>
+                  <Icon path={icons.savings} size={22} />
+                </div>
+                <div className="help-tile-title">Rate Experience</div>
+                <div className="help-tile-desc">Rate your overall experience</div>
+              </div>
+
+              <div className="help-tile" onClick={() => { resetFb(); setFbCategory('Feature Request'); setFbOpen(true); }}>
+                <div className="help-tile-icon" style={{
+                  background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.12)',
+                }}>
+                  <Icon path={icons.ai} size={22} />
+                </div>
+                <div className="help-tile-title">Send Suggestion</div>
+                <div className="help-tile-desc">Share feature ideas and improvements</div>
+              </div>
+
+              <div className="help-tile" onClick={() => { resetFb(); setFbCategory('Bug Report'); setFbOpen(true); }}>
+                <div className="help-tile-icon" style={{
+                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.12)',
+                }}>
+                  <Icon path={icons.alertCircle} size={22} />
+                </div>
+                <div className="help-tile-title">Report an Issue</div>
+                <div className="help-tile-desc">Report technical or UI problems</div>
+              </div>
+            </div>
+
+            {/* Primary Action Button */}
+            <div style={{ textAlign: 'center' }}>
+              <button className="help-primary-btn" onClick={() => { resetFb(); setFbOpen(true); }}>
+                <Icon path={icons.send} size={16} />
+                Open Feedback Form
+              </button>
+            </div>
+          </Card>
+        </div>
+
         {/* ═══ Danger Zone ═══ */}
         <div style={{ ...fadeInUp, ...stagger(6) }}>
           <Card style={{
@@ -1564,6 +1823,161 @@ export default function Settings() {
               {curLoading ? 'Saving...' : 'Save'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ═══ Feedback Modal ═══ */}
+      <Modal open={fbOpen} onClose={() => { if (!fbLoading) { resetFb(); setFbOpen(false); } }}>
+        <div style={{ padding: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '22px' }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 'var(--radius-md)',
+              background: 'linear-gradient(135deg, rgba(20,184,166,0.15), rgba(59,130,246,0.12))',
+              border: '1px solid rgba(20,184,166,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon path={icons.send} size={17} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Send Feedback
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                We'd love to hear from you
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleFbSubmit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Category */}
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Category
+                </label>
+                <select
+                  className="fb-field"
+                  value={fbCategory}
+                  onChange={(e) => setFbCategory(e.target.value)}
+                  style={{ cursor: 'pointer', appearance: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' }}
+                >
+                  <option>General Feedback</option>
+                  <option>Feature Request</option>
+                  <option>Bug Report</option>
+                  <option>UI/UX Suggestion</option>
+                  <option>Performance Issue</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Rating
+                </label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      className={`fb-star ${(fbHoverRating || fbRating) >= star ? 'active' : ''}`}
+                      onClick={() => setFbRating(star)}
+                      onMouseEnter={() => setFbHoverRating(star)}
+                      onMouseLeave={() => setFbHoverRating(0)}
+                      style={{
+                        background: 'none', border: 'none', padding: '4px',
+                        fontSize: '1.5rem', lineHeight: 1,
+                        color: (fbHoverRating || fbRating) >= star ? '#F59E0B' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease',
+                        transform: (fbHoverRating || fbRating) >= star ? 'scale(1.15)' : 'scale(1)',
+                        filter: (fbHoverRating || fbRating) >= star ? 'drop-shadow(0 0 4px rgba(245,158,11,0.4))' : 'none',
+                      }}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  {fbRating > 0 && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', alignSelf: 'center', marginLeft: '6px' }}>
+                      {fbRating === 1 ? 'Poor' : fbRating === 2 ? 'Fair' : fbRating === 3 ? 'Good' : fbRating === 4 ? 'Very Good' : 'Excellent'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Message */}
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Message
+                </label>
+                <textarea
+                  className="fb-field"
+                  rows={4}
+                  value={fbMessage}
+                  onChange={(e) => setFbMessage(e.target.value)}
+                  placeholder="Tell us what you liked, what could be improved, or describe the issue you encountered..."
+                  style={{ resize: 'vertical', minHeight: '90px' }}
+                />
+              </div>
+
+              {/* Optional Email */}
+              <div>
+                <label style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', display: 'block', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Contact Email <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                </label>
+                <input
+                  className="fb-field"
+                  type="email"
+                  value={fbEmail}
+                  onChange={(e) => setFbEmail(e.target.value)}
+                  placeholder="your@email.com"
+                />
+              </div>
+            </div>
+
+            {fbMsg.text && (
+              <div style={{
+                marginTop: '16px', padding: '10px 14px', borderRadius: 'var(--radius-md)',
+                fontSize: '0.8rem', fontWeight: 500,
+                background: fbMsg.type === 'success' ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${fbMsg.type === 'success' ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}`,
+                color: fbMsg.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+              }}>
+                {fbMsg.text}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '22px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { resetFb(); setFbOpen(false); }}
+                style={{
+                  padding: '9px 20px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem',
+                  fontWeight: 600, cursor: 'pointer', border: '1px solid var(--border)',
+                  background: 'transparent', color: 'var(--text-secondary)',
+                }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={fbLoading}
+                style={{
+                  padding: '9px 22px', borderRadius: 'var(--radius-md)', fontSize: '0.82rem',
+                  fontWeight: 600, cursor: fbLoading ? 'not-allowed' : 'pointer', border: 'none',
+                  background: 'var(--accent)', color: '#fff', opacity: fbLoading ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                {fbLoading ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+                    </svg>
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Icon path={icons.send} size={14} />
+                    Submit Feedback
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </Modal>
 

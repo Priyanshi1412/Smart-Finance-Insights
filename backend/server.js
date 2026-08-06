@@ -75,6 +75,7 @@ const settingsRoutes = require('./routes/settings');
 const reportRoutes = require('./routes/reportRoutes');
 const jarvisRoutes = require('./routes/jarvisRoutes');
 const exportRoutes = require('./routes/export');
+const feedbackRoutes = require('./routes/feedback');
 
 app.use('/api', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -91,6 +92,7 @@ app.use('/api/ml', mlRoutes);
 app.use('/api/reports', reportRoutes);
   app.use('/api/jarvis', jarvisRoutes);
   app.use('/api/export', exportRoutes);
+  app.use('/api/feedback', feedbackRoutes);
   app.use('/api', settingsRoutes);
 
 // Global error handler

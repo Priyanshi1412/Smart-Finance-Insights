@@ -71,6 +71,7 @@ export const authAPI = {
 export const dashboardAPI = {
   getSummary: () => api.get('/api/dashboard/summary'),
   getRecentTransactions: () => api.get('/api/dashboard/recent-transactions'),
+  getOverview: () => api.get('/api/dashboard/overview'),
 };
 
 export const incomeAPI = {
@@ -180,6 +181,10 @@ export const exportAPI = {
   goalCSV: () => api.get('/api/export/goals/csv', { responseType: 'blob' }),
   goalExcel: () => api.get('/api/export/goals/xlsx', { responseType: 'blob' }),
   comprehensiveCSV: () => api.get('/api/export/comprehensive/csv', { responseType: 'blob' }),
+};
+
+export const feedbackAPI = {
+  submit: (data) => api.post('/api/feedback', data),
 };
 
 export default api;

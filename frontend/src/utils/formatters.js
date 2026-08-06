@@ -72,3 +72,32 @@ export function formatMonthYear(monthKey) {
   const date = new Date(year, month - 1);
   return date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
+
+export function fmtRelativeTime(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const diffMs = now - d;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const calendarDays = Math.floor((today - targetDay) / (1000 * 60 * 60 * 24));
+
+  if (calendarDays === 0) return 'Today';
+  if (calendarDays === 1) return 'Yesterday';
+  if (calendarDays < 7) return `${calendarDays} days ago`;
+  if (calendarDays < 30) return `${Math.floor(calendarDays / 7)}w ago`;
+  return fmtDate(dateStr);
+}
+
+export function fmtTrend(value) {
+  const num = Number(value);
+  if (isNaN(num)) return { text: '0%', direction: 'neutral' };
+  const prefix = num > 0 ? '+' : '';
+  return { text: `${prefix}${num}%`, direction: num > 0 ? 'up' : num < 0 ? 'down' : 'neutral' };
+}
